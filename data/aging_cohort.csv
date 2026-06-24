@@ -1,0 +1,18 @@
+product_id,product_unit,warehouse_name,diff_days_inhouse,stok_gudang_tanpa_booking,total_purchase_stok_tanpa_booking,status_wl
+109,SKU-0109 (kg),North DC,15,16.0,863000.0,WL
+109,SKU-0109 (kg),North DC,22,43.0,145000.0,WL
+110,SKU-0110 (bottle),South DC,18,121.0,285000.0,WL-A
+112,SKU-0112 (box),Central DC,35,191.0,189000.0,WL
+113,SKU-0113 (pack),South DC,45,117.0,832000.0,WL
+115,SKU-0115 (bottle),North DC,60,149.0,74000.0,WL
+116,SKU-0116 (pcs),Central DC,28,45.0,156000.0,WL
+118,SKU-0118 (pack),South DC,14,183.0,221000.0,WL
+119,SKU-0119 (kg),Consignment DC,40,20.0,375000.0,WL
+110,SKU-0110 (bottle),North DC,33,63.0,189000.0,Reguler
+111,SKU-0111 (pcs),Central DC,31,96.0,815000.0,WL
+111,SKU-0111 (pcs),Central DC,45,52.0,884000.0,WL
+114,SKU-0114 (kg),North DC,33,136.0,374000.0,WL
+117,SKU-0117 (box),South DC,50,138.0,346000.0,WL-A
+120,SKU-0120 (bottle),Central DC,38,50.0,249000.0,WL
+114,SKU-0114 (kg),South DC,30,11.0,601000.0,WL
+117,SKU-0117 (box),Consignment DC,60,24.0,218000.0,WL

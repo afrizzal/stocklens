@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stocklens"
+version = "0.1.0"
+description = "Inventory demand-classification & aging-stock alerting pipeline, rebuilt standalone on synthetic data."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Afrizzal" }]
+requires-python = ">=3.10"
+keywords = [
+    "inventory",
+    "demand-classification",
+    "turnover",
+    "aging-stock",
+    "data-engineering",
+    "duckdb",
+    "pandas",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+# Runtime dependencies (LOCKED per BUILD-CONTRACT §6.1).
+dependencies = [
+    "pandas",
+    "numpy",
+    "duckdb",
+    "jinja2",
+    "typer",
+    "tabulate",                       # df.to_markdown(...) backend
+    "tomli; python_version < '3.11'", # tomllib backport for py3.10
+]
+
+[project.optional-dependencies]
+# `uv sync --extra viz` to pull in the Streamlit viewer.
+viz = ["streamlit"]
+
+[project.urls]
+Origin = "https://github.com/afrizzal/stocklens/blob/master/ORIGIN.md"
+
+# Console entry point: `stocklens <command>` mirrors `python cli.py <command>`.
+[project.scripts]
+stocklens = "cli:app"
+
+# Dev tooling (PEP 735 dependency group; `uv sync` installs these by default).
+[dependency-groups]
+dev = ["pytest", "ruff", "mypy"]
+
+# ── Packaging (src layout) ──────────────────────────────────────────────────
+# The importable package is src/stocklens. cli.py / shims / seed / app live at the
+# repo root and are run as scripts, not imported as installed modules.
+[tool.hatch.build.targets.wheel]
+packages = ["src/stocklens"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"cli.py" = "cli.py"
+"shims" = "shims"
+
+# ── Ruff ────────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "shims", "seed", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort (import ordering)
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501", # line length handled by the formatter
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["stocklens", "shims"]
+
+# ── Mypy ────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true  # pandas/duckdb/typer stubs vary across versions
+
+# ── Pytest ──────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-q"

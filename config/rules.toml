@@ -1,0 +1,85 @@
+# config/rules.toml — StockLens tunables.
+#
+# Every value the original pipeline hard-coded is externalized here so the
+# heuristics read as tunable policy rather than buried constants. All values are
+# illustrative / synthetic — they do not reflect any real business thresholds.
+#
+# Loaded once into a frozen `Rules` dataclass via stocklens.load_rules().
+# Key names and default values are LOCKED by docs/planning/BUILD-CONTRACT.md §2;
+# no module may re-hardcode any of these.
+
+[aging]
+# Aged-stock thresholds: a grain is "aged" once it has sat in-house this many days.
+daily_needs_days = 15              # Daily-Needs aged threshold (keep diff_days_inhouse >= 15)
+lifestyle_days   = 31              # Lifestyle aged threshold (keep diff_days_inhouse >= 31)
+# Warehouses whose name matches this token are dropped from the aging cohort.
+exclude_warehouse_name_like = "Consignment"
+# Only watch-list rows are kept: status_wl LIKE 'WL%'.
+status_wl_prefix = "WL"
+# Category split: a cohort row is "Daily Needs" when its rtp_category equals this
+# value OR its rtp_sub_category matches the sub-category token below; else "Lifestyle".
+daily_needs_category = "Staples"
+daily_needs_subcategory_like = "Flour"
+
+[turnover]
+# Turnover-ratio (TOR) caps. A rounded TOR at or above the threshold is replaced
+# by a cap value so a tiny average inventory cannot blow up the ratio.
+tor_cap_threshold = 30             # rounded TOR >= 30 -> capped
+tor_cap_value_default = 14         # cap value for the L7 / L14 / L21 windows
+tor_cap_value_l30 = 30             # cap value specifically for the L30D window
+recur_fallback = 14               # recur_tor when every rolling window is zero
+
+[classification]
+# Weighted demand score: weighted = weight_qty * qty + weight_orders * orderCount.
+weight_qty = 0.8
+weight_orders = 0.2
+# Classification limit = mean + std, damped to mean + std_damp_factor * std when
+# the per-warehouse std exceeds std_damp_threshold (wide-variance damping).
+std_damp_threshold = 1000
+std_damp_factor = 0.25
+# Premium product tag (synthetic replacement for the original internal tag id).
+premium_tag_id = 1
+premium_tag_name = "Premium"
+
+[stock]
+# Warehouse with this id is excluded from the stock pipeline entirely.
+excluded_warehouse_id = 9
+# Special-handling warehouses: status forced to 1, lead time set to avg_lead_time,
+# PIC set to a buyer, label_priority cleared.
+special_warehouse_ids = [7]
+# Fallbacks applied after the product-status merge.
+lead_time_fallback = 3             # adj_lead_time fillna
+avg_lead_time_fallback = 1         # avg_lead_time fillna
+# Keep only "mandiri" (self-ordering) grains: filter_mandiri == 'Include'.
+include_mandiri_only = true
+
+[windows]
+# Cumulative rolling buckets: L14D includes L7D, etc.
+rolling_days = [7, 14, 21, 30]
+sales_lookback_days = 30           # orders pulled over the last 30 days
+stock_request_lookback_days = 7    # stock requests aggregated over the last 7 days
+sell_out_lookback_days = 7         # aging sell-out window
+po_lookback_months = 6             # purchase-order history window for lead time
+
+[demand]
+# Demand-rate floor: qty_per_day is floored to at least this value so slow movers
+# still receive a token reorder signal (original: qty/day == 0 -> 1).
+qty_per_day_min = 1
+# Single-sample outlier upper bound = qty * outlier_single_row_factor (lower = 0).
+outlier_single_row_factor = 1.5
+# IQR bounds: upper = q3 + iqr_factor * IQR, lower = q1 - iqr_factor * IQR.
+iqr_factor = 1.5
+
+[report]
+# Recipients / sender are METADATA ONLY — they are printed in the report header.
+# Nothing is ever emailed; the aging job writes HTML + Markdown to disk.
+recipients = ["purchasing-lead@example.com", "ops@example.com"]
+sender = "reports@example.com"
+team_greeting = "Dear Purchasing Team"
+signature = "Regards, Analytics"
+output_dir = "out"
+
+[paths]
+duckdb_path = "stocklens.duckdb"
+product_status_csv = "data/product_status.csv"
+aging_cohort_csv = "data/aging_cohort.csv"
