@@ -1,5 +1,9 @@
 # StockLens
 
+[![CI](https://github.com/afrizzal/stocklens/actions/workflows/ci.yml/badge.svg)](https://github.com/afrizzal/stocklens/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 > Inventory demand-classification & aging-stock alerting pipeline, rebuilt standalone on synthetic data.
 
 StockLens is a clean-room, fully runnable reconstruction of a production inventory-intelligence
