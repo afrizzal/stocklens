@@ -82,9 +82,9 @@ def _load_toml(path: Path) -> dict[str, Any]:
     when available.
     """
     try:  # pragma: no cover - branch depends on interpreter version
-        import tomllib  # type: ignore[import-not-found]
+        import tomllib
     except ModuleNotFoundError:  # pragma: no cover - exercised on py3.10 (tomli backport)
-        import tomli as tomllib  # type: ignore[no-redef]
+        import tomli as tomllib
 
     with path.open("rb") as fh:
         return tomllib.load(fh)
@@ -118,9 +118,7 @@ def load_rules(path: str = _DEFAULT_CONFIG) -> Rules:
 
     missing = [section for section in _REQUIRED_SECTIONS if section not in data]
     if missing:
-        raise KeyError(
-            f"config {config_path} is missing required section(s): {', '.join(missing)}"
-        )
+        raise KeyError(f"config {config_path} is missing required section(s): {', '.join(missing)}")
 
     return Rules(
         aging=dict(data["aging"]),

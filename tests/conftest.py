@@ -118,16 +118,25 @@ def turnover_db(
     con.execute(_TURNOVER_DDL)
 
     # Grain 500/wh1: the 0.75 case.
-    _insert_turnover(con, product_id=500, warehouse_id=1, period=now - timedelta(days=8),
-                     stock_value=1_000_000.0)                          # l7d_inv (inv)
-    _insert_turnover(con, product_id=500, warehouse_id=1, period=now - timedelta(days=1),
-                     stock_value=600_000.0)                            # final_inv (final)
-    _insert_turnover(con, product_id=500, warehouse_id=1, period=now - timedelta(days=3),
-                     stock_value=0.0, incoming=200_000.0)              # incoming in L7D window
+    _insert_turnover(
+        con, product_id=500, warehouse_id=1, period=now - timedelta(days=8), stock_value=1_000_000.0
+    )  # l7d_inv (inv)
+    _insert_turnover(
+        con, product_id=500, warehouse_id=1, period=now - timedelta(days=1), stock_value=600_000.0
+    )  # final_inv (final)
+    _insert_turnover(
+        con,
+        product_id=500,
+        warehouse_id=1,
+        period=now - timedelta(days=3),
+        stock_value=0.0,
+        incoming=200_000.0,
+    )  # incoming in L7D window
 
     # Grain 600/wh1: never-restocked → all windows zero → recur fallback.
-    _insert_turnover(con, product_id=600, warehouse_id=1, period=now - timedelta(days=1),
-                     stock_value=0.0)
+    _insert_turnover(
+        con, product_id=600, warehouse_id=1, period=now - timedelta(days=1), stock_value=0.0
+    )
     return con
 
 
@@ -163,8 +172,7 @@ _MARGIN_DDL = (
     "product_id BIGINT, quantity INTEGER)",
     "CREATE TABLE product_attributes(id BIGINT, product_id BIGINT, unit VARCHAR, "
     "position INTEGER, status INTEGER)",
-    "CREATE TABLE product_stocks(id BIGINT, product_attribute_id BIGINT, "
-    "warehouse_id BIGINT)",
+    "CREATE TABLE product_stocks(id BIGINT, product_attribute_id BIGINT, warehouse_id BIGINT)",
     "CREATE TABLE product_selling_prices(id BIGINT, product_stock_id BIGINT, "
     "selling_price DOUBLE, minimum_quantity INTEGER)",
     "CREATE TABLE warehouses(id BIGINT, name VARCHAR, type VARCHAR)",
@@ -191,18 +199,14 @@ def margin_db(
         con.execute(ddl)
 
     con.execute("INSERT INTO warehouses VALUES (1,'North DC','normal')")
-    con.execute(
-        "INSERT INTO orders VALUES (1, TIMESTAMP '2026-01-15 10:00', 'INV1', 1, 0, 2)"
-    )
+    con.execute("INSERT INTO orders VALUES (1, TIMESTAMP '2026-01-15 10:00', 'INV1', 1, 0, 2)")
     con.execute(
         "INSERT INTO order_items VALUES "
         "(10,1,500,5000,'SKU-0500','pcs',5,NULL,NULL),"
         "(11,1,500,5001,'SKU-0500','pcs',3,NULL,NULL)"
     )
     # order_logs OUT rows are negative; quantity_out = ol.quantity * -1.
-    con.execute(
-        "INSERT INTO order_logs VALUES (1,10,-5,1,'order',900),(1,11,-3,1,'order',901)"
-    )
+    con.execute("INSERT INTO order_logs VALUES (1,10,-5,1,'order',900),(1,11,-3,1,'order',901)")
     con.execute(
         "INSERT INTO inventory_published VALUES "
         "(900,800,5000,1,0,'regular','grosir',0,TIMESTAMP '2026-01-15 10:00'),"
@@ -221,13 +225,9 @@ def margin_db(
     con.execute("INSERT INTO suppliers VALUES (1,'Supplier Alpha')")
     # Lot costs: inventory 800 → 7,000 ; inventory 801 → 8,000.
     con.execute("INSERT INTO margin_costs VALUES (800,7000.0),(801,8000.0)")
-    con.execute(
-        "INSERT INTO product_attributes VALUES (5000,500,'pcs',1,1),(5001,500,'pcs',2,1)"
-    )
+    con.execute("INSERT INTO product_attributes VALUES (5000,500,'pcs',1,1),(5001,500,'pcs',2,1)")
     con.execute("INSERT INTO product_stocks VALUES (60,5000,1),(61,5001,1)")
-    con.execute(
-        "INSERT INTO product_selling_prices VALUES (1,60,10000.0,1),(2,61,12000.0,1)"
-    )
+    con.execute("INSERT INTO product_selling_prices VALUES (1,60,10000.0,1),(2,61,12000.0,1)")
     return con
 
 

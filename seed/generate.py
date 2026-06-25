@@ -230,12 +230,9 @@ def build_orders(
     the last 7 days.
     """
     attr_by_product = {
-        int(r.product_id): (int(r.id), str(r.unit))
-        for r in attributes.itertuples(index=False)
+        int(r.product_id): (int(r.id), str(r.unit)) for r in attributes.itertuples(index=False)
     }
-    product_name_by_id = {
-        int(row.id): str(row.name) for row in products.itertuples(index=False)
-    }
+    product_name_by_id = {int(row.id): str(row.name) for row in products.itertuples(index=False)}
 
     orders_rows: list[dict] = []
     items_rows: list[dict] = []
@@ -388,9 +385,7 @@ def build_orders(
         publish_seq += 1
 
     orders = pd.concat([orders, pd.DataFrame(booking_orders)], ignore_index=True)
-    order_items = pd.concat(
-        [order_items, pd.DataFrame(booking_items)], ignore_index=True
-    )
+    order_items = pd.concat([order_items, pd.DataFrame(booking_items)], ignore_index=True)
     order_logs = pd.concat([order_logs, pd.DataFrame(booking_logs)], ignore_index=True)
 
     return {
@@ -550,9 +545,7 @@ def build_purchasing(rng: np.random.Generator) -> dict[str, pd.DataFrame]:
             }
         )
         # status log: one row carrying current_status (max across logs).
-        posl_rows.append(
-            {"purchase_order_id": po_id, "current_status": status}
-        )
+        posl_rows.append({"purchase_order_id": po_id, "current_status": status})
         # 1-3 line items per PO.
         n_items = int(rng.integers(1, 4))
         chosen = rng.choice(PRODUCT_IDS, size=n_items, replace=False)
@@ -630,9 +623,7 @@ def build_stock_requests(rng: np.random.Generator) -> dict[str, pd.DataFrame]:
     for wh in NORMAL_WAREHOUSES:
         for pid in PRODUCT_IDS:
             pa_id = pid
-            ps_rows.append(
-                {"id": ps_id, "product_attribute_id": pa_id, "warehouse_id": wh}
-            )
+            ps_rows.append({"id": ps_id, "product_attribute_id": pa_id, "warehouse_id": wh})
             # selling price (round synthetic), minimum_quantity = 1.
             psp_rows.append(
                 {
@@ -703,9 +694,7 @@ def build_turnover_history(rng: np.random.Generator) -> pd.DataFrame:
             # stock value drifts day to day.
             stock_value = base_value * (1.0 + 0.01 * float(rng.standard_normal()))
             # incoming components: mostly PO, occasional returns/transfers.
-            sum_value_po = (
-                float(int(rng.integers(0, 50)) * 1000) if rng.random() < 0.4 else 0.0
-            )
+            sum_value_po = float(int(rng.integers(0, 50)) * 1000) if rng.random() < 0.4 else 0.0
             rows.append(
                 {
                     "product_id": pid,
@@ -716,9 +705,7 @@ def build_turnover_history(rng: np.random.Generator) -> pd.DataFrame:
                     "sum_value_retur": 0.0,
                     "sum_value_retur_vendor": 0.0,
                     "sum_value_transfer": (
-                        float(int(rng.integers(0, 10)) * 1000)
-                        if rng.random() < 0.1
-                        else 0.0
+                        float(int(rng.integers(0, 10)) * 1000) if rng.random() < 0.1 else 0.0
                     ),
                     "sum_value_po_vendor": 0.0,
                 }
@@ -869,9 +856,7 @@ def build_aging_cohort_rows(rng: np.random.Generator) -> tuple[list[dict], list[
     staples_pids = [pid for i, pid in enumerate(RTP_PRODUCT_IDS) if i % 3 != 2]
     lifestyle_pids = [pid for i, pid in enumerate(RTP_PRODUCT_IDS) if i % 3 == 2]
 
-    unit_by_pid = {
-        pid: UNITS[(pid - PRODUCT_ID_START) % len(UNITS)] for pid in PRODUCT_IDS
-    }
+    unit_by_pid = {pid: UNITS[(pid - PRODUCT_ID_START) % len(UNITS)] for pid in PRODUCT_IDS}
 
     # (product_id, warehouse_name, diff_days_inhouse, status_wl) — explicit so the
     # kept/dropped outcome of every row is obvious and stable.
@@ -879,8 +864,8 @@ def build_aging_cohort_rows(rng: np.random.Generator) -> tuple[list[dict], list[
 
     # --- Daily-Needs keepers (Staples, age >= 15, WL, normal warehouse) -------
     dn_keep_specs = [
-        (staples_pids[0], "North DC", 15, "WL"),   # boundary keeper (==15)
-        (staples_pids[0], "North DC", 22, "WL"),   # same grain, second lot
+        (staples_pids[0], "North DC", 15, "WL"),  # boundary keeper (==15)
+        (staples_pids[0], "North DC", 22, "WL"),  # same grain, second lot
         (staples_pids[1], "South DC", 18, "WL-A"),
         (staples_pids[2], "Central DC", 35, "WL"),
         (staples_pids[3], "South DC", 45, "WL"),
@@ -890,14 +875,14 @@ def build_aging_cohort_rows(rng: np.random.Generator) -> tuple[list[dict], list[
     specs.extend(dn_keep_specs)
 
     # --- Daily-Needs droppers -------------------------------------------------
-    specs.append((staples_pids[6], "South DC", 14, "WL"))          # under threshold
-    specs.append((staples_pids[7], "Consignment DC", 40, "WL"))    # excluded warehouse
-    specs.append((staples_pids[1], "North DC", 33, "Reguler"))     # non-WL status
+    specs.append((staples_pids[6], "South DC", 14, "WL"))  # under threshold
+    specs.append((staples_pids[7], "Consignment DC", 40, "WL"))  # excluded warehouse
+    specs.append((staples_pids[1], "North DC", 33, "Reguler"))  # non-WL status
 
     # --- Lifestyle keepers (Apparel, age >= 31, WL, normal warehouse) ---------
     ls_keep_specs = [
-        (lifestyle_pids[0], "Central DC", 31, "WL"),   # boundary keeper (==31)
-        (lifestyle_pids[0], "Central DC", 45, "WL"),   # same grain, second lot
+        (lifestyle_pids[0], "Central DC", 31, "WL"),  # boundary keeper (==31)
+        (lifestyle_pids[0], "Central DC", 45, "WL"),  # same grain, second lot
         (lifestyle_pids[1], "North DC", 33, "WL"),
         (lifestyle_pids[2], "South DC", 50, "WL-A"),
         (lifestyle_pids[3], "Central DC", 38, "WL"),
@@ -905,7 +890,7 @@ def build_aging_cohort_rows(rng: np.random.Generator) -> tuple[list[dict], list[
     specs.extend(ls_keep_specs)
 
     # --- Lifestyle droppers ---------------------------------------------------
-    specs.append((lifestyle_pids[1], "South DC", 30, "WL"))        # under threshold
+    specs.append((lifestyle_pids[1], "South DC", 30, "WL"))  # under threshold
     specs.append((lifestyle_pids[2], "Consignment DC", 60, "WL"))  # excluded warehouse
 
     rows: list[dict] = []
@@ -919,9 +904,7 @@ def build_aging_cohort_rows(rng: np.random.Generator) -> tuple[list[dict], list[
                 "warehouse_name": wh_name,
                 "diff_days_inhouse": int(age),
                 "stok_gudang_tanpa_booking": float(int(rng.integers(10, 200))),
-                "total_purchase_stok_tanpa_booking": float(
-                    int(rng.integers(50, 900)) * 1000
-                ),
+                "total_purchase_stok_tanpa_booking": float(int(rng.integers(50, 900)) * 1000),
                 "status_wl": status_wl,
             }
         )
@@ -1027,7 +1010,8 @@ def _summary(db_path: Path) -> str:
         ]
         counts = []
         for n in names:
-            c = con.execute(f"SELECT count(*) FROM {n}").fetchone()[0]
+            row = con.execute(f"SELECT count(*) FROM {n}").fetchone()
+            c = row[0] if row else 0
             counts.append(f"{n}={c}")
         return ", ".join(counts)
     finally:

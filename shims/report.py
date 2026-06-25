@@ -207,9 +207,7 @@ def _build_context(context: dict[str, Any], *, as_html: bool) -> dict[str, Any]:
         "signature": context.get("signature", "Regards, Analytics"),
         "sender": context.get("sender", "reports@example.com"),
         "recipients_display": recipients_display,
-        "generated_at": context.get(
-            "generated_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ),
+        "generated_at": context.get("generated_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         "sections": list(_TABLE_SECTIONS),
         "tables": tables,
     }
@@ -229,9 +227,7 @@ def _render_table(value: Any, *, as_html: bool) -> str:
         if value.empty:
             return ""
         if as_html:
-            return value.to_html(
-                classes="table table-striped", index=False, justify="center"
-            )
+            return value.to_html(classes="table table-striped", index=False, justify="center")
         return _df_to_markdown(value)
     # Unknown type: render its string form rather than crash.
     return str(value)

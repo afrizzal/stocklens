@@ -81,7 +81,7 @@ def test_window_filters_drop_non_include_and_low_status(rules, now):
     """The In[11] filters drop ``status<=1``, the excluded warehouse, and non-mandiri."""
     base = _order_line(now=now, age_days=3, qty=5, order_id=1)
     kept = dict(base)
-    dropped_status = {**base, "order_id": 2, "status": 1}            # status not > 1
+    dropped_status = {**base, "order_id": 2, "status": 1}  # status not > 1
     dropped_excluded_wh = {
         **base,
         "order_id": 3,
@@ -128,8 +128,8 @@ def test_weighted_score_and_classification_boundary(rules):
     """A(100,10)=82, B(20,4)=16.8, C(5,2)=4.4 → mean 34.4, std ≈41.69, limit ≈76.09."""
     rows: list[dict] = []
     rows += _grain_lines(product_id=1, qty=100, n_orders=10)  # A → weighted 82
-    rows += _grain_lines(product_id=2, qty=20, n_orders=4)    # B → weighted 16.8
-    rows += _grain_lines(product_id=3, qty=5, n_orders=2)     # C → weighted 4.4
+    rows += _grain_lines(product_id=2, qty=20, n_orders=4)  # B → weighted 16.8
+    rows += _grain_lines(product_id=3, qty=5, n_orders=2)  # C → weighted 4.4
     df = pd.DataFrame(rows)
 
     result = classify_demand(df, rules).set_index("product_id")
@@ -159,9 +159,9 @@ def test_fast_moving_between_mean_and_limit(rules):
     """
     rows: list[dict] = []
     rows += _grain_lines(product_id=1, qty=100, n_orders=1)  # weighted 80.2 (top)
-    rows += _grain_lines(product_id=2, qty=50, n_orders=1)   # weighted 40.2 (mid)
-    rows += _grain_lines(product_id=3, qty=10, n_orders=1)   # weighted 8.2
-    rows += _grain_lines(product_id=4, qty=10, n_orders=1)   # weighted 8.2
+    rows += _grain_lines(product_id=2, qty=50, n_orders=1)  # weighted 40.2 (mid)
+    rows += _grain_lines(product_id=3, qty=10, n_orders=1)  # weighted 8.2
+    rows += _grain_lines(product_id=4, qty=10, n_orders=1)  # weighted 8.2
     df = pd.DataFrame(rows)
 
     result = classify_demand(df, rules).set_index("product_id")
@@ -186,7 +186,7 @@ def test_std_damp_branch(rules):
     # Two grains with a huge spread → sample std comfortably above the threshold.
     rows: list[dict] = []
     rows += _grain_lines(product_id=1, qty=10_000, n_orders=1)  # weighted 8000.2
-    rows += _grain_lines(product_id=2, qty=10, n_orders=1)      # weighted 8.2
+    rows += _grain_lines(product_id=2, qty=10, n_orders=1)  # weighted 8.2
     df = pd.DataFrame(rows)
 
     result = classify_demand(df, rules).set_index("product_id")

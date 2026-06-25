@@ -97,12 +97,9 @@ def load_margin(
     )
 
     # Aggregate to the grain (orig In[96]).
-    agg = (
-        df.groupby(["product_id", "unit", "warehouse_id"], as_index=False)[
-            ["gmv", "total_margin"]
-        ]
-        .sum()
-    )
+    agg = df.groupby(["product_id", "unit", "warehouse_id"], as_index=False)[
+        ["gmv", "total_margin"]
+    ].sum()
 
     # gm_rate with divide-by-zero guard (orig In[97], guarded per contract §3.3).
     agg["gm_rate"] = np.where(

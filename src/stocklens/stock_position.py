@@ -174,15 +174,12 @@ def load_stock_requests(con: duckdb.DuckDBPyConnection, rules: Rules) -> pd.Data
             columns=["product_id", "product_attribute_id", "warehouse_id", "qty_req"]
         )
 
-    return (
-        pd.pivot_table(
-            data=df_req,
-            values="qty_req",
-            index=["product_id", "product_attribute_id", "warehouse_id"],
-            aggfunc="sum",
-        )
-        .reset_index()
-    )
+    return pd.pivot_table(
+        data=df_req,
+        values="qty_req",
+        index=["product_id", "product_attribute_id", "warehouse_id"],
+        aggfunc="sum",
+    ).reset_index()
 
 
 def assemble_position(

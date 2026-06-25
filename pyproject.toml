@@ -42,7 +42,7 @@ dependencies = [
 viz = ["streamlit"]
 
 [project.urls]
-Origin = "https://github.com/afrizzal/stocklens/blob/master/ORIGIN.md"
+Origin = "https://github.com/afrizzal/stocklens/blob/main/ORIGIN.md"
 
 # Console entry point: `stocklens <command>` mirrors `python cli.py <command>`.
 [project.scripts]
@@ -93,6 +93,14 @@ warn_unused_ignores = true
 no_implicit_optional = true
 check_untyped_defs = true
 ignore_missing_imports = true  # pandas/duckdb/typer stubs vary across versions
+
+# NumPy ships PEP 695 ``type`` statements in its stubs (valid only on 3.12+); skip
+# following them so mypy targeting 3.10 doesn't choke on the stub syntax. NumPy is
+# treated as untyped here, consistent with the pandas/duckdb handling above.
+[[tool.mypy.overrides]]
+module = ["numpy"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
 
 # ── Pytest ──────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, type-check, test & smoke (Python 3.10)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv and set up Python 3.10
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: "3.10"
+          enable-cache: true
+
+      - name: Install dependencies (clean-room uv.lock rehearsal)
+        run: uv sync
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Mypy type check
+        run: uv run mypy src shims cli.py seed
+
+      - name: Pytest
+        run: uv run pytest
+
+      - name: End-to-end smoke (seed -> consolidate -> aging)
+        run: uv run python cli.py all

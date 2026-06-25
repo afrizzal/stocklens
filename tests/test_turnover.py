@@ -109,9 +109,7 @@ def test_load_turnover_end_to_end(turnover_db, rules, now):
     assert result.loc[500, "recur_tor"] == pytest.approx(0.75)
 
     # The all-zero grain falls through to the fallback.
-    assert result.loc[600, "recur_tor"] == pytest.approx(
-        float(rules.turnover["recur_fallback"])
-    )
+    assert result.loc[600, "recur_tor"] == pytest.approx(float(rules.turnover["recur_fallback"]))
 
     # Contract-required output columns are present.
     assert {"product_id", "warehouse_id", "l30d_tor", "recur_tor"}.issubset(

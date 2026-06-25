@@ -190,9 +190,7 @@ def run_consolidate(
     df_stocks = load_stocks(con, rules)
     df_status = load_product_status(rules)
     df_req = load_stock_requests(con, rules)
-    df_position = assemble_position(
-        df_orders_in_ex, df_stocks, df_status, df_flow, df_req, rules
-    )
+    df_position = assemble_position(df_orders_in_ex, df_stocks, df_status, df_flow, df_req, rules)
 
     # --- Stage 3: margin / turnover / tag relations (In[92]-In[109]) ---------------
     df_margin = load_margin(con, rules, now=as_of)
@@ -202,9 +200,7 @@ def run_consolidate(
     # --- Stage 4: final merge on the grain key (In[98]-In[110]) --------------------
     # Margin joins on (product_id, unit, warehouse_id); tags on product_id; turnover
     # on (product_id, warehouse_id) — exactly the original merge sequence.
-    df = df_position.merge(
-        df_margin, how="left", on=["product_id", "unit", "warehouse_id"]
-    )
+    df = df_position.merge(df_margin, how="left", on=["product_id", "unit", "warehouse_id"])
     df = df.merge(df_tags[["product_id", "status_wl"]], how="left", on=["product_id"])
     df = df.merge(
         df_tor[["product_id", "warehouse_id", "l30d_tor", "recur_tor"]],
@@ -359,7 +355,9 @@ def _ensure_seeded(con: duckdb.DuckDBPyConnection, rules: Rules) -> None:
     # (Re)write the two committed CSV seeds if absent, so the product-status /
     # aging-cohort reads downstream resolve on a fresh checkout.
     data_dir = Path(rules.paths["product_status_csv"])
-    data_dir = (_REPO_ROOT / data_dir).resolve().parent if not data_dir.is_absolute() else data_dir.parent
+    data_dir = (
+        (_REPO_ROOT / data_dir).resolve().parent if not data_dir.is_absolute() else data_dir.parent
+    )
     if not (data_dir / "product_status.csv").is_file():
         seed.write_product_status_csv(seed.np.random.default_rng(seed.SEED), data_dir)
     if not (data_dir / "aging_cohort.csv").is_file():
@@ -377,7 +375,7 @@ def _is_populated(con: duckdb.DuckDBPyConnection) -> bool:
     return bool(count and count[0] > 0)
 
 
-def _load_seed_module():  # type: ignore[no-untyped-def]
+def _load_seed_module():
     """Import ``seed/generate.py`` by file path and return the module object."""
     if not _SEED_SCRIPT.is_file():  # pragma: no cover - defensive
         raise FileNotFoundError(f"seed script not found: {_SEED_SCRIPT}")

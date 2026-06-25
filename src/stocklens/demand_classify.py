@@ -42,8 +42,8 @@ _WINDOW_DIVIDERS: dict[str, int] = {"L7D": 7, "L14D": 14, "L21D": 21, "L30D": 30
 
 
 def load_orders(
-    con: "duckdb.DuckDBPyConnection",
-    rules: "Rules",
+    con: duckdb.DuckDBPyConnection,
+    rules: Rules,
     *,
     now: date,
 ) -> pd.DataFrame:
@@ -96,7 +96,7 @@ def load_orders(
     return _window_orders(df, rules, now=now)
 
 
-def _window_orders(df: pd.DataFrame, rules: "Rules", *, now: date) -> pd.DataFrame:
+def _window_orders(df: pd.DataFrame, rules: Rules, *, now: date) -> pd.DataFrame:
     """Apply the In[11] filters and the age/window tagging (In[20]-In[25]).
 
     Split out from :func:`load_orders` so the windowing logic is testable without
@@ -149,7 +149,7 @@ def _window_orders(df: pd.DataFrame, rules: "Rules", *, now: date) -> pd.DataFra
     return df[keep].reset_index(drop=True)
 
 
-def classify_demand(df_orders: pd.DataFrame, rules: "Rules") -> pd.DataFrame:
+def classify_demand(df_orders: pd.DataFrame, rules: Rules) -> pd.DataFrame:
     """Classify each grain as Super Fast / Fast / Slow Moving (In[12]-In[19]).
 
     The weighted velocity score is ``weight_qty * Σqty + weight_orders * #invoices``
@@ -196,9 +196,8 @@ def classify_demand(df_orders: pd.DataFrame, rules: "Rules") -> pd.DataFrame:
         return pd.DataFrame(columns=cols)
 
     # In[12]-In[14]: per-grain Σqty + #invoices -> weighted score.
-    agg = (
-        df_orders.groupby(grain, as_index=False)
-        .agg(sum_qty=("qty_sales", "sum"), count_invoice=("order_id", "count"))
+    agg = df_orders.groupby(grain, as_index=False).agg(
+        sum_qty=("qty_sales", "sum"), count_invoice=("order_id", "count")
     )
     agg["weighted"] = weight_qty * agg["sum_qty"] + weight_orders * agg["count_invoice"]
 
@@ -264,7 +263,7 @@ def _iqr_bounds(qty: pd.Series, *, single_factor: float, iqr_factor: float) -> t
     return upper, lower
 
 
-def remove_outliers(df_orders: pd.DataFrame, rules: "Rules") -> pd.DataFrame:
+def remove_outliers(df_orders: pd.DataFrame, rules: Rules) -> pd.DataFrame:
     """Clean per-window demand outliers and derive the qty/day demand rate.
 
     Ports In[29]-In[38]. For every ``(warehouse_id, days, product_attribute_id)``
@@ -325,7 +324,7 @@ def remove_outliers(df_orders: pd.DataFrame, rules: "Rules") -> pd.DataFrame:
     excl_frames: list[pd.DataFrame] = []
 
     # In[29]-In[30]: bounds + outlier flags per (warehouse, window, product_attribute).
-    for (warehouse_id, period), grp in df_orders.groupby(["warehouse_id", "days"], sort=False):
+    for (_warehouse_id, period), grp in df_orders.groupby(["warehouse_id", "days"], sort=False):
         tagged: list[pd.DataFrame] = []
         for _, sub in grp.groupby("product_attribute_id", sort=False):
             upper, lower = _iqr_bounds(
@@ -391,7 +390,5 @@ def _finalize_outlier_frame(frames: list[pd.DataFrame], status: str) -> pd.DataF
     df = pd.concat(frames, ignore_index=True)
     df = df.rename(columns={"qty_sales": "total_quantity"})
     df["status_outliers"] = status
-    df = df.sort_values(
-        by=["warehouse_id", "product_id", "product_attribute_id", "total_quantity"]
-    )
+    df = df.sort_values(by=["warehouse_id", "product_id", "product_attribute_id", "total_quantity"])
     return df[cols].reset_index(drop=True)

@@ -61,10 +61,7 @@ def test_threshold_split_daily_needs_vs_lifestyle(aging_db, rules):
 
     aged = categorize_and_filter(cohort, aging_db, rules)
 
-    surviving = {
-        (row.product_id, row.warehouse_name, row.Category)
-        for row in aged.itertuples()
-    }
+    surviving = {(row.product_id, row.warehouse_name, row.Category) for row in aged.itertuples()}
     assert surviving == {
         (201, "North DC", "Daily Needs"),
         (202, "North DC", "Lifestyle"),
@@ -75,9 +72,7 @@ def test_threshold_split_daily_needs_vs_lifestyle(aging_db, rules):
 def test_sub_category_flour_is_daily_needs(aging_db, rules):
     """A ``Lifestyle`` rtp_category with a ``Flour`` sub-category → Daily Needs."""
     # 203 has rtp_category='Lifestyle' but rtp_sub_category='Flour' in the fixture.
-    cohort = pd.DataFrame(
-        [_cohort_row(product_id=203, warehouse_name="North DC", diff_days=20)]
-    )
+    cohort = pd.DataFrame([_cohort_row(product_id=203, warehouse_name="North DC", diff_days=20)])
 
     aged = categorize_and_filter(cohort, aging_db, rules)
 
@@ -120,9 +115,7 @@ def test_non_wl_status_dropped(aging_db, rules):
 @pytest.mark.duckdb
 def test_sell_out_excludes_reward(aging_db, rules, now):
     """The last-7-day sell-out join keeps ``regular`` (7) and excludes ``reward`` (100)."""
-    cohort = pd.DataFrame(
-        [_cohort_row(product_id=203, warehouse_name="North DC", diff_days=20)]
-    )
+    cohort = pd.DataFrame([_cohort_row(product_id=203, warehouse_name="North DC", diff_days=20)])
     aged = categorize_and_filter(cohort, aging_db, rules)
 
     frames = join_sell_out(aged, aging_db, rules, now=now)

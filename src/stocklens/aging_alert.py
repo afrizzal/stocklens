@@ -81,9 +81,9 @@ def load_cohort(rules: Rules) -> pd.DataFrame:
     df["product_id"] = df["product_id"].astype("int64")
     df["diff_days_inhouse"] = df["diff_days_inhouse"].astype("int64")
     df["stok_gudang_tanpa_booking"] = df["stok_gudang_tanpa_booking"].astype("float64")
-    df["total_purchase_stok_tanpa_booking"] = df[
-        "total_purchase_stok_tanpa_booking"
-    ].astype("float64")
+    df["total_purchase_stok_tanpa_booking"] = df["total_purchase_stok_tanpa_booking"].astype(
+        "float64"
+    )
     df["product_unit"] = df["product_unit"].astype("string").fillna("")
     df["warehouse_name"] = df["warehouse_name"].astype("string").fillna("")
     df["status_wl"] = df["status_wl"].astype("string").fillna("")
@@ -149,9 +149,7 @@ def categorize_and_filter(
     # --- 3. Category-differentiated age threshold ----------------------------
     daily_days = int(aging_cfg["daily_needs_days"])
     lifestyle_days = int(aging_cfg["lifestyle_days"])
-    aged_mask = (
-        (df["Category"] == "Daily Needs") & (df["diff_days_inhouse"] >= daily_days)
-    ) | (
+    aged_mask = ((df["Category"] == "Daily Needs") & (df["diff_days_inhouse"] >= daily_days)) | (
         (df["Category"] == "Lifestyle") & (df["diff_days_inhouse"] >= lifestyle_days)
     )
     df = df[aged_mask].copy()
@@ -176,15 +174,12 @@ def categorize_and_filter(
             ]
         )
 
-    df_aged = (
-        df.groupby(_COHORT_GROUP_KEYS, as_index=False, sort=True)
-        .agg(
-            stok_gudang_tanpa_booking=("stok_gudang_tanpa_booking", "sum"),
-            total_purchase_stok_tanpa_booking=(
-                "total_purchase_stok_tanpa_booking",
-                "sum",
-            ),
-        )
+    df_aged = df.groupby(_COHORT_GROUP_KEYS, as_index=False, sort=True).agg(
+        stok_gudang_tanpa_booking=("stok_gudang_tanpa_booking", "sum"),
+        total_purchase_stok_tanpa_booking=(
+            "total_purchase_stok_tanpa_booking",
+            "sum",
+        ),
     )
     return df_aged
 
@@ -213,9 +208,7 @@ def join_sell_out(
     """
     lookback_days = int(rules.windows["sell_out_lookback_days"])
     product_ids = (
-        sorted({int(pid) for pid in df_aged["product_id"].tolist()})
-        if not df_aged.empty
-        else []
+        sorted({int(pid) for pid in df_aged["product_id"].tolist()}) if not df_aged.empty else []
     )
     df_revenue = _load_sell_out(con, product_ids, now=now, lookback_days=lookback_days)
 
@@ -283,9 +276,7 @@ def run_aging(
 # ---------------------------------------------------------------------------
 
 
-def _load_product_rtp(
-    con: duckdb.DuckDBPyConnection, product_ids: list[int]
-) -> pd.DataFrame:
+def _load_product_rtp(con: duckdb.DuckDBPyConnection, product_ids: list[int]) -> pd.DataFrame:
     """Fetch ``product_rtp`` rows for the cohort's products via DuckDB."""
     columns = ["product_id", "rtp_category", "rtp_sub_category", "status_wl"]
     if not product_ids:
@@ -370,21 +361,18 @@ def _build_display_table(merged: pd.DataFrame, *, category: str | None) -> pd.Da
             empty[col] = empty[col].astype("int64")
         return empty
 
-    grouped = (
-        df.groupby(
-            ["warehouse_name", "product_unit", "Category"],
-            as_index=False,
-            sort=True,
-        )
-        .agg(
-            stok_gudang_tanpa_booking=("stok_gudang_tanpa_booking", "sum"),
-            total_purchase_stok_tanpa_booking=(
-                "total_purchase_stok_tanpa_booking",
-                "sum",
-            ),
-            qty_sell_out=("qty_sell_out", "sum"),
-            gmv=("gmv", "sum"),
-        )
+    grouped = df.groupby(
+        ["warehouse_name", "product_unit", "Category"],
+        as_index=False,
+        sort=True,
+    ).agg(
+        stok_gudang_tanpa_booking=("stok_gudang_tanpa_booking", "sum"),
+        total_purchase_stok_tanpa_booking=(
+            "total_purchase_stok_tanpa_booking",
+            "sum",
+        ),
+        qty_sell_out=("qty_sell_out", "sum"),
+        gmv=("gmv", "sum"),
     )
 
     for col in (
@@ -393,16 +381,12 @@ def _build_display_table(merged: pd.DataFrame, *, category: str | None) -> pd.Da
         "qty_sell_out",
         "gmv",
     ):
-        grouped[col] = (
-            grouped[col].fillna(0).round(0).astype("int64")
-        )
+        grouped[col] = grouped[col].fillna(0).round(0).astype("int64")
 
     return grouped[_REPORT_COLUMNS]
 
 
-def _render_report(
-    frames: dict[str, pd.DataFrame], rules: Rules, *, now: date
-) -> tuple[str, str]:
+def _render_report(frames: dict[str, pd.DataFrame], rules: Rules, *, now: date) -> tuple[str, str]:
     """Render the HTML + MD aging report to ``out/`` (no email, no Sheets).
 
     Builds the :func:`shims.report.save_report` context: a generic greeting, the
@@ -419,9 +403,7 @@ def _render_report(
         "title": "Aging Stock - WL Product",
         "greeting": report_cfg.get("team_greeting", "Dear Purchasing Team"),
         "signature": report_cfg.get("signature", "Regards, Analytics"),
-        "generated_at": datetime.combine(now, datetime.min.time()).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        ),
+        "generated_at": datetime.combine(now, datetime.min.time()).strftime("%Y-%m-%d %H:%M:%S"),
         "sender": report_cfg.get("sender", ""),
         "recipients": list(report_cfg.get("recipients", [])),
         "intro_daily_needs": (

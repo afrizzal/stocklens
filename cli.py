@@ -26,13 +26,13 @@ command for deterministic, reproducible runs (used by the tests).
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import logging
 import sys
 import time
 from datetime import date
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -50,10 +50,8 @@ for _p in (str(_SRC_DIR), str(_REPO_ROOT)):
 # Ensure UTF-8 stdout/stderr so status glyphs (✓, •) render on legacy Windows
 # consoles (cp1252), where the default encoding raises UnicodeEncodeError.
 for _stream in (sys.stdout, sys.stderr):
-    try:
-        _stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
-    except (AttributeError, ValueError):  # pragma: no cover - non-reconfigurable stream
-        pass
+    with contextlib.suppress(AttributeError, ValueError):  # pragma: no cover
+        _stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
 
 from shims import data_io  # noqa: E402  (import after sys.path bootstrap)
 from stocklens import load_rules  # noqa: E402
@@ -166,7 +164,7 @@ def seed(
 @app.command()
 def consolidate(
     config: str = _CONFIG_OPTION,
-    now: Optional[str] = _NOW_OPTION,
+    now: str | None = _NOW_OPTION,
 ) -> None:
     """Run the consolidation pipeline -> ``out/consolidate_purchasing_agg.parquet``."""
     _configure_logging()
@@ -192,7 +190,7 @@ def consolidate(
 @app.command()
 def aging(
     config: str = _CONFIG_OPTION,
-    now: Optional[str] = _NOW_OPTION,
+    now: str | None = _NOW_OPTION,
 ) -> None:
     """Run the aging-stock alert -> ``out/aging_report.html`` + ``.md``."""
     _configure_logging()
@@ -218,7 +216,7 @@ def aging(
 @app.command()
 def all(  # noqa: A001 - "all" is the contract-mandated subcommand name
     config: str = _CONFIG_OPTION,
-    now: Optional[str] = _NOW_OPTION,
+    now: str | None = _NOW_OPTION,
 ) -> None:
     """Run the full pipeline: ``seed`` → ``consolidate`` → ``aging``."""
     _configure_logging()
@@ -236,9 +234,7 @@ def all(  # noqa: A001 - "all" is the contract-mandated subcommand name
         df = run_consolidate(con, rules, now=run_now)
         out_dir = Path(rules.report.get("output_dir", "out"))
         parquet = out_dir / "consolidate_purchasing_agg.parquet"
-        typer.secho(
-            f"  • consolidate: {len(df):,} grains -> {parquet}", fg=typer.colors.CYAN
-        )
+        typer.secho(f"  • consolidate: {len(df):,} grains -> {parquet}", fg=typer.colors.CYAN)
 
         # 3) aging -------------------------------------------------------------
         frames = run_aging_alert(rules, con, now=run_now)

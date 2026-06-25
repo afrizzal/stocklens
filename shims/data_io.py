@@ -103,9 +103,7 @@ def read_sql_file(path: str) -> str:
     if direct.is_file():
         return direct.read_text(encoding="utf-8")
 
-    raise FileNotFoundError(
-        f"SQL file not found: {path!r} (looked in {_SQL_DIR} and {direct})"
-    )
+    raise FileNotFoundError(f"SQL file not found: {path!r} (looked in {_SQL_DIR} and {direct})")
 
 
 def write_parquet(df: pd.DataFrame, path: str) -> str:
@@ -177,8 +175,7 @@ def ensure_seeded(db_path: str = "stocklens.duckdb") -> str:
 
     if not _is_populated(resolved):
         raise RuntimeError(
-            f"seed step completed but {resolved} still has no tables; "
-            "check seed/generate.py"
+            f"seed step completed but {resolved} still has no tables; check seed/generate.py"
         )
     return str(resolved)
 
@@ -268,8 +265,7 @@ def _is_populated(db_path: Path) -> bool:
         return False
     try:
         count = con.execute(
-            "SELECT count(*) FROM information_schema.tables "
-            "WHERE table_schema = 'main'"
+            "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'main'"
         ).fetchone()
         return bool(count and count[0] > 0)
     finally:
@@ -296,7 +292,5 @@ def _run_seed(db_path: Path) -> None:
 
     entry = getattr(module, "main", None) or getattr(module, "generate", None)
     if entry is None:  # pragma: no cover - defensive
-        raise AttributeError(
-            "seed/generate.py must expose main(db_path) or generate(db_path)"
-        )
+        raise AttributeError("seed/generate.py must expose main(db_path) or generate(db_path)")
     entry(str(db_path))

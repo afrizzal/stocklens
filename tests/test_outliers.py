@@ -48,9 +48,7 @@ def _outlier_lines(
 @pytest.mark.unit
 def test_iqr_bounds_five_samples():
     """[2,3,3,4,50] → upper 6, lower 2 (pandas linear-interpolation quantiles)."""
-    upper, lower = _iqr_bounds(
-        pd.Series([2, 3, 3, 4, 50]), single_factor=1.5, iqr_factor=1.5
-    )
+    upper, lower = _iqr_bounds(pd.Series([2, 3, 3, 4, 50]), single_factor=1.5, iqr_factor=1.5)
     assert upper == 6
     assert lower == 2
 
@@ -93,7 +91,7 @@ def test_remove_outliers_totals_drop_the_fifty(rules):
 
     # days_divider is the window length; qty_per_day = int(total/divider), floored to min 1.
     assert int(incl["days_divider"]) == 7
-    assert int(incl["qty_per_day"]) == 62 // 7          # = 8
+    assert int(incl["qty_per_day"]) == 62 // 7  # = 8
     assert int(excl["qty_per_day"]) == max(12 // 7, 1)  # = 1 (floor bumps 1 → 1)
 
 
