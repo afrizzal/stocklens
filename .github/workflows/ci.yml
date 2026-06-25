@@ -40,3 +40,9 @@ jobs:
 
       - name: End-to-end smoke (seed -> consolidate -> aging)
         run: uv run python cli.py all
+
+      - name: Data-quality contract gate
+        run: uv run python cli.py validate
+
+      - name: App page smoke (stubbed Streamlit; no extras needed)
+        run: uv run pytest tests/test_app_smoke.py -q

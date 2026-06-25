@@ -1,0 +1,17 @@
+# Streamlit theme + server config for the StockLens viewer.
+# Applies to `streamlit run app/viewer.py` locally and on Streamlit Community Cloud.
+
+[theme]
+base = "light"
+primaryColor = "#2563eb"          # indigo accent (links, widgets, highlights)
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f1f5f9"
+textColor = "#0f172a"
+font = "sans serif"
+
+[server]
+# Headless-friendly defaults; no telemetry prompts on first boot.
+headless = true
+
+[browser]
+gatherUsageStats = false
