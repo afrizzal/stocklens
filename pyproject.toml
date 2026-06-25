@@ -40,6 +40,8 @@ dependencies = [
 [project.optional-dependencies]
 # `uv sync --extra viz` to pull in the Streamlit viewer.
 viz = ["streamlit"]
+# `uv sync --extra api` to pull in the FastAPI JSON layer (httpx powers TestClient).
+api = ["fastapi", "uvicorn", "httpx"]
 
 [project.urls]
 Origin = "https://github.com/afrizzal/stocklens/blob/main/ORIGIN.md"

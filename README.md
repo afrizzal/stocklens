@@ -146,6 +146,35 @@ trap), and inventory value-at-cost is reconstructed from the synthetic lots × p
 
 ---
 
+## JSON API (FastAPI)
+
+The same analytics engine is also exposed as a read-only REST API, so the pipeline result is a
+queryable **data product** — not just a dashboard. It reuses the identical `stocklens.analytics`
+functions, so the API, CLI, and viewer can never disagree.
+
+```bash
+uv sync --extra api
+uv run python cli.py all                       # build the artifacts first
+uv run uvicorn api.main:app --reload           # http://127.0.0.1:8000/docs  (Swagger UI)
+```
+
+| Endpoint | Returns |
+|---|---|
+| `GET /healthz` | liveness + dataset freshness (`as_of`, grain/row counts) |
+| `GET /kpis` | the executive headline KPIs |
+| `GET /grains` | paginated, filterable per-grain rows |
+| `GET /demand/classification` | demand-class distribution + per-warehouse breakdown |
+| `GET /stock/reorder` | the reorder worklist |
+| `GET /aging` | aged-cohort value-at-risk + the daily-needs / lifestyle tables |
+| `GET /margin/gmroi` | the GMROI ranking |
+| `GET /abc-xyz` | the ABC-XYZ matrix cells + counts |
+| `POST /simulate` | re-run demand classification under a modified policy; returns the mix delta |
+
+Pydantic response models give a typed, auto-generated OpenAPI schema at `/openapi.json`; payloads are
+NaN/Inf-safe. Every endpoint is covered by `tests/test_api.py` (FastAPI `TestClient`).
+
+---
+
 ## Skills demonstrated
 
 | Area | In this repo |
@@ -156,7 +185,8 @@ trap), and inventory value-at-cost is reconstructed from the synthetic lots × p
 | **Forecasting** | MA/SES projection with an honest holdout backtest (WAPE) vs a seasonal-naive baseline |
 | **Data reliability** | a data-quality contract that fails CI (`stocklens validate`) + a corrupted-frame test |
 | **App / product** | a 10-page Streamlit dashboard, executive KPI framing, downloadable worklists/reports |
-| **Engineering rigor** | `pytest` (incl. worked-example & analytics tests), `ruff`, `mypy`, GitHub Actions CI |
+| **Backend / API** | a typed FastAPI JSON layer (`api/main.py`) reusing the same engine, with auto OpenAPI docs |
+| **Engineering rigor** | `pytest` (worked-example, analytics, page-smoke & API tests), `ruff`, `mypy`, GitHub Actions CI |
 
 ---
 
@@ -241,9 +271,10 @@ src/stocklens/analytics.py        read-only derived analytics (value-at-cost, AB
 app/viewer.py                     Streamlit home (executive overview) — `viz` extra
 app/pages/                        the 9 analytical pages (Demand, Reorder, Aging, …)
 app/_data.py                      cached loaders + UI helpers shared by every page
+api/main.py                       FastAPI JSON layer over the same analytics (optional `api` extra)
 cli.py                            Typer CLI: seed | consolidate | aging | validate | all
 requirements.txt                  Streamlit Community Cloud deps; `.streamlit/config.toml` theme
-tests/                            worked-example, analytics, and page-smoke tests
+tests/                            worked-example, analytics, page-smoke, and API tests
 ```
 
 ---

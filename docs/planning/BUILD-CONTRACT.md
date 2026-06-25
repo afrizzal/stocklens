@@ -761,6 +761,8 @@ the 44-column consolidated schema (§3.4) are **unchanged**, and no new live sid
 | `cli.py validate` | Runs `analytics.validate_consolidated` over the artifact; exits non-zero on any hard-check failure (CI gate). |
 | `tests/test_analytics.py` | Unit tests for the analytics core, incl. the grain double-counting trap and a corrupted-frame-must-fail contract test. |
 | `tests/test_app_smoke.py` | Executes every page's `main()` against the real artifacts with `streamlit`/`altair` stubbed (no runtime / no extra). |
+| `api/main.py` | A thin **FastAPI** JSON layer (`uvicorn api.main:app`) exposing the same analytics as REST: `/healthz`, `/kpis`, `/grains`, `/demand/classification`, `/stock/reorder`, `/aging`, `/margin/gmroi`, `/abc-xyz`, `POST /simulate`, with auto OpenAPI at `/docs`. Read-only; reuses the pure functions (`api` optional extra). |
+| `tests/test_api.py` | `TestClient` coverage of every endpoint (skipped without the `api` extra). |
 | `requirements.txt`, `.streamlit/config.toml` | Streamlit Community Cloud deploy. |
 
 ### 9.2 Rules that still hold
