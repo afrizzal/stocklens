@@ -186,6 +186,7 @@ NaN/Inf-safe. Every endpoint is covered by `tests/test_api.py` (FastAPI `TestCli
 | **Data reliability** | a data-quality contract that fails CI (`stocklens validate`) + a corrupted-frame test |
 | **App / product** | a 10-page Streamlit dashboard, executive KPI framing, downloadable worklists/reports |
 | **Backend / API** | a typed FastAPI JSON layer (`api/main.py`) reusing the same engine, with auto OpenAPI docs |
+| **DevOps / containers** | a multi-stage Dockerfile + docker-compose (API + dashboard), non-root, healthchecked, CI-built |
 | **Engineering rigor** | `pytest` (worked-example, analytics, page-smoke & API tests), `ruff`, `mypy`, GitHub Actions CI |
 
 ---
@@ -203,6 +204,27 @@ git-ignored, so on first boot `app/_data.ensure_artifacts` runs `seed → consol
 3. Update the **Open in Streamlit** badge URL at the top of this README to your app's URL.
 
 `.streamlit/config.toml` carries the theme and headless server defaults.
+
+### Run with Docker
+
+One image serves **both** surfaces — the synthetic dataset is baked in at build time (fixed RNG
+seed), so there is no runtime data step:
+
+```bash
+docker compose up --build
+#   API       → http://localhost:8000/docs   (FastAPI + Swagger)
+#   Dashboard → http://localhost:8501         (Streamlit, 10 pages)
+```
+
+Or just the API:
+
+```bash
+docker build -t stocklens .
+docker run --rm -p 8000:8000 stocklens          # http://localhost:8000/docs
+```
+
+The image is multi-stage (uv-locked install in the builder, a slim non-root runtime) with a
+`HEALTHCHECK` on `/healthz`. CI builds it and smoke-tests the running container on every push.
 
 ---
 

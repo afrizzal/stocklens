@@ -764,6 +764,7 @@ the 44-column consolidated schema (§3.4) are **unchanged**, and no new live sid
 | `api/main.py` | A thin **FastAPI** JSON layer (`uvicorn api.main:app`) exposing the same analytics as REST: `/healthz`, `/kpis`, `/grains`, `/demand/classification`, `/stock/reorder`, `/aging`, `/margin/gmroi`, `/abc-xyz`, `POST /simulate`, with auto OpenAPI at `/docs`. Read-only; reuses the pure functions (`api` optional extra). |
 | `tests/test_api.py` | `TestClient` coverage of every endpoint (skipped without the `api` extra). |
 | `requirements.txt`, `.streamlit/config.toml` | Streamlit Community Cloud deploy. |
+| `Dockerfile`, `.dockerignore`, `docker-compose.yml` | One multi-stage image (non-root, healthchecked) serving the API (default) or the dashboard (CMD override); the deterministic artifacts are baked at build time. CI builds the image and smoke-tests the running container. |
 
 ### 9.2 Rules that still hold
 
