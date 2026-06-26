@@ -108,15 +108,13 @@ def open_con(rules: Rules) -> duckdb.DuckDBPyConnection:
 
 @st.cache_data(show_spinner=False)
 def load_consolidated(_rules: Rules) -> pd.DataFrame | None:
-    """The consolidated Parquet (CSV fallback), or ``None`` if it is absent."""
+    """The consolidated artifact (read via DuckDB; CSV fallback), or ``None`` if absent."""
+    from shims import data_io
+
     parquet = resolve_out_dir(_rules) / "consolidate_purchasing_agg.parquet"
-    if parquet.is_file():
-        try:
-            return pd.read_parquet(parquet)
-        except (ImportError, ValueError, OSError):
-            pass
-    csv = parquet.with_suffix(".csv")
-    return pd.read_csv(csv) if csv.is_file() else None
+    if not parquet.is_file() and not parquet.with_suffix(".csv").is_file():
+        return None
+    return data_io.read_table(str(parquet))
 
 
 @st.cache_data(show_spinner=False)

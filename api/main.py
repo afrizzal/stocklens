@@ -72,10 +72,13 @@ def _duckdb_path() -> Path:
 
 @lru_cache(maxsize=1)
 def _consolidated() -> pd.DataFrame:
+    from shims import data_io
+
     parquet = _out_dir() / "consolidate_purchasing_agg.parquet"
     if not parquet.is_file():
         raise HTTPException(503, "consolidated artifact missing — run `python cli.py all` first")
-    return pd.read_parquet(parquet)
+    # Read via DuckDB (no pyarrow dependency); the writer emits both .parquet and .csv.
+    return data_io.read_table(str(parquet))
 
 
 def _con() -> duckdb.DuckDBPyConnection:

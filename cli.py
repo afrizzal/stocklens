@@ -226,8 +226,6 @@ def validate(
     exits non-zero on any hard-check failure so a broken pipeline fails the build.
     """
     _configure_logging()
-    import pandas as pd  # noqa: PLC0415 - local import keeps CLI import light
-
     from stocklens.analytics import validate_consolidated  # noqa: PLC0415
 
     rules = _load(config)
@@ -243,7 +241,8 @@ def validate(
         )
         raise typer.Exit(code=2)
 
-    df = pd.read_parquet(parquet)
+    # Read via DuckDB (no pyarrow dependency); the writer emits both .parquet and .csv.
+    df = data_io.read_table(str(parquet))
     ok, results = validate_consolidated(df)
     for result in results:
         glyph = "✓" if result.passed else "✗"
