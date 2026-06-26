@@ -40,3 +40,35 @@ jobs:
 
       - name: End-to-end smoke (seed -> consolidate -> aging)
         run: uv run python cli.py all
+
+      - name: Data-quality contract gate
+        run: uv run python cli.py validate
+
+      - name: App page smoke (stubbed Streamlit; no extras needed)
+        run: uv run pytest tests/test_app_smoke.py -q
+
+      - name: API smoke (FastAPI TestClient)
+        run: |
+          uv sync --extra api
+          uv run pytest tests/test_api.py -q
+
+  docker:
+    name: Docker image build & container smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t stocklens:ci .
+
+      - name: Run API container and smoke-test it
+        run: |
+          docker run -d --name stocklens-api -p 8000:8000 stocklens:ci
+          for _ in $(seq 1 30); do
+            curl -fsS http://localhost:8000/healthz >/dev/null && break
+            sleep 2
+          done
+          echo "--- /healthz ---"; curl -fsS http://localhost:8000/healthz; echo
+          echo "--- /kpis ---";    curl -fsS http://localhost:8000/kpis | head -c 400; echo
+          docker rm -f stocklens-api

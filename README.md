@@ -3,13 +3,22 @@
 [![CI](https://github.com/afrizzal/stocklens/actions/workflows/ci.yml/badge.svg)](https://github.com/afrizzal/stocklens/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://stocklens.streamlit.app)
 
-> Inventory demand-classification & aging-stock alerting pipeline, rebuilt standalone on synthetic data.
+> Inventory demand-classification, stock-position, margin/turnover & aging-stock analytics — a
+> standalone, fully reproducible pipeline with a **10-page interactive dashboard**.
 
 StockLens is a clean-room, fully runnable reconstruction of a production inventory-intelligence
-pipeline. It seeds a synthetic relational dataset into DuckDB, runs three statistical transform
-modules over it, writes a consolidated per-grain Parquet table, and renders an aging-stock alert as a
-local HTML/Markdown report. No external services, no real data — the **algorithms** are the portfolio.
+pipeline. It seeds a synthetic relational dataset into DuckDB, runs statistical transform modules
+over it, writes a consolidated per-grain Parquet table, and renders an aging-stock alert — then a
+read-only **analytics layer** (`stocklens.analytics`) and a **multi-page Streamlit app** turn that
+output into the operational and financial views a buyer/planner actually acts on: an executive KPI
+overview, a reorder worklist, ABC-XYZ segmentation, GMROI, a backtested forecast, a live policy
+simulator, and a self-checking data-quality contract. No external services, no real data — the
+**algorithms** are the portfolio.
+
+> **Live demo:** deploy in one click to Streamlit Community Cloud (see [Deploy](#deploy)) — then
+> replace the badge URL above. The fixed RNG seed means the hosted app reproduces these exact numbers.
 
 See [`ORIGIN.md`](ORIGIN.md) for the "from production to portfolio" honesty note.
 
@@ -57,8 +66,18 @@ All thresholds, weights, windows, and warehouse rules are externalized to
                              │
               ┌──────────────┴───────────────┐
               ▼                              ▼
-   app/viewer.py (Streamlit)     aging_alert.py → out/aging_report.{html,md}
+   aging_alert.py → out/aging_report      stocklens.analytics  (read-only derived metrics:
+        .{html,md}                          value-at-cost · days-of-cover · ABC/XYZ · GMROI
+                                            · forecast/backtest · data-quality contract)
+                                                          │
+                                                          ▼
+                                     app/  Streamlit multi-page app (10 pages)
+                                     viewer.py (home) + app/pages/*  ·  app/_data.py
 ```
+
+The locked pipeline (`seed → consolidate → aging`) is never modified; `stocklens.analytics` and the
+`app/` viewer are a purely **additive** read-only layer over its artifacts (see
+[`docs/planning/BUILD-CONTRACT.md`](docs/planning/BUILD-CONTRACT.md) §9).
 
 This mirrors the shape of the original scheduled DAG: extract → transform → load to an analytical
 store → surface to stakeholders. The storage and delivery layers are open substitutes
@@ -74,7 +93,7 @@ Requires Python 3.10+ and [`uv`](https://docs.astral.sh/uv/).
 uv sync                                  # install runtime + dev deps into .venv
 uv run python cli.py all                 # seed → consolidate → aging (end-to-end)
 
-# optional: the Streamlit viewer (pulls in the `viz` extra)
+# optional: the 10-page interactive dashboard (pulls in the `viz` extra)
 uv sync --extra viz
 uv run streamlit run app/viewer.py
 ```
@@ -85,6 +104,7 @@ Run individual stages:
 uv run python cli.py seed          # build stocklens.duckdb from seed/generate.py
 uv run python cli.py consolidate   # write out/consolidate_purchasing_agg.parquet
 uv run python cli.py aging         # write out/aging_report.html + .md
+uv run python cli.py validate      # run the data-quality contract (exits non-zero on failure)
 ```
 
 Useful flags (every subcommand): `--now 2026-06-25` pins the "as of" date for deterministic
@@ -92,6 +112,119 @@ output, and `--config path/to/rules.toml` overrides the config location.
 
 Outputs land in `./out/` (git-ignored). The seeded `stocklens.duckdb` is also git-ignored —
 it is regenerated from `seed/generate.py`, so the repo stays free of binary artifacts.
+
+---
+
+## The multi-page app
+
+`app/viewer.py` is the home page of a native Streamlit multi-page app; the analytical pages live in
+`app/pages/`. Each page is a thin presentation script over the pure `stocklens.analytics` engine — no
+business logic is re-implemented in the UI.
+
+| Page | What it shows | Inventory technique |
+|---|---|---|
+| **Overview** (home) | Executive KPIs + the capital-at-risk callout | DIO, value-at-risk, dead-capital share |
+| **Demand Classification** | Super/Fast/Slow mix and the weighted-score-vs-limit rule | velocity tiering, IQR outliers |
+| **Stock & Reorder** | Five-layer stock position + ranked reorder worklist | days-of-cover vs lead time, stockout RAG |
+| **Aging & Dead Stock** | Capital tied up past age thresholds, with sell-out | aging cohorts, dead-capital valuation |
+| **ABC-XYZ Matrix** | Pareto value × demand variability, 3×3 policy grid | ABC/XYZ segmentation |
+| **Margin & GMROI** | Margin rate vs turnover, GMROI ranking | GMROI, gross-margin bridge |
+| **Forecast & Reorder Point** | Backtested demand forecast + safety stock | MA/SES, WAPE vs seasonal-naive, reorder point |
+| **What-if Simulator** | Re-tune the classification policy live | scenario / sensitivity analysis |
+| **Data Quality** | The consolidated frame's pass/fail contract | data contracts / validation |
+| **Methodology** | Every formula, tunable, and honest caveat | documentation & reproducibility |
+
+The derived analytics are a **read-only, additive** layer (`src/stocklens/analytics.py`): the locked
+pipeline math and its 44-column output schema are never modified. Value figures correctly collapse the
+8-rows-per-grain consolidated frame to one row per grain before summing (the headline double-counting
+trap), and inventory value-at-cost is reconstructed from the synthetic lots × purchase price.
+
+> **Note on this Windows dev box:** `import altair` / the Streamlit runtime native-crash here due to an
+> OpenSSL/DLL conflict in the local Python build — the app runs fine on Linux (CI and Streamlit Cloud).
+> Page **logic** is verified portably in `tests/test_app_smoke.py`, which executes every page against
+> the real artifacts with `streamlit`/`altair` stubbed (no runtime, no extra required).
+
+---
+
+## JSON API (FastAPI)
+
+The same analytics engine is also exposed as a read-only REST API, so the pipeline result is a
+queryable **data product** — not just a dashboard. It reuses the identical `stocklens.analytics`
+functions, so the API, CLI, and viewer can never disagree.
+
+```bash
+uv sync --extra api
+uv run python cli.py all                       # build the artifacts first
+uv run uvicorn api.main:app --reload           # http://127.0.0.1:8000/docs  (Swagger UI)
+```
+
+| Endpoint | Returns |
+|---|---|
+| `GET /healthz` | liveness + dataset freshness (`as_of`, grain/row counts) |
+| `GET /kpis` | the executive headline KPIs |
+| `GET /grains` | paginated, filterable per-grain rows |
+| `GET /demand/classification` | demand-class distribution + per-warehouse breakdown |
+| `GET /stock/reorder` | the reorder worklist |
+| `GET /aging` | aged-cohort value-at-risk + the daily-needs / lifestyle tables |
+| `GET /margin/gmroi` | the GMROI ranking |
+| `GET /abc-xyz` | the ABC-XYZ matrix cells + counts |
+| `POST /simulate` | re-run demand classification under a modified policy; returns the mix delta |
+
+Pydantic response models give a typed, auto-generated OpenAPI schema at `/openapi.json`; payloads are
+NaN/Inf-safe. Every endpoint is covered by `tests/test_api.py` (FastAPI `TestClient`).
+
+---
+
+## Skills demonstrated
+
+| Area | In this repo |
+|---|---|
+| **Data engineering** | DuckDB + Parquet, a `seed → consolidate → aging` DAG, deterministic RNG seeding |
+| **Analytics engineering** | a reusable typed analytics core (`stocklens.analytics`), grain-correct aggregation |
+| **Supply-chain analytics** | demand tiering, ABC/XYZ, reorder point + safety stock, GMROI, aging/dead-stock |
+| **Forecasting** | MA/SES projection with an honest holdout backtest (WAPE) vs a seasonal-naive baseline |
+| **Data reliability** | a data-quality contract that fails CI (`stocklens validate`) + a corrupted-frame test |
+| **App / product** | a 10-page Streamlit dashboard, executive KPI framing, downloadable worklists/reports |
+| **Backend / API** | a typed FastAPI JSON layer (`api/main.py`) reusing the same engine, with auto OpenAPI docs |
+| **DevOps / containers** | a multi-stage Dockerfile + docker-compose (API + dashboard), non-root, healthchecked, CI-built |
+| **Engineering rigor** | `pytest` (worked-example, analytics, page-smoke & API tests), `ruff`, `mypy`, GitHub Actions CI |
+
+---
+
+## Deploy
+
+The app deploys to **Streamlit Community Cloud** with no manual data step — the artifacts are
+git-ignored, so on first boot `app/_data.ensure_artifacts` runs `seed → consolidate → aging` once
+(deterministic seed ⇒ the hosted numbers equal a local run).
+
+1. Push this repo to GitHub.
+2. On [share.streamlit.io](https://share.streamlit.io), create an app pointing at **`app/viewer.py`**.
+   Cloud installs from [`requirements.txt`](requirements.txt) (which intentionally does *not* install
+   the package, so the repo source — including `seed/generate.py` — runs directly).
+3. Update the **Open in Streamlit** badge URL at the top of this README to your app's URL.
+
+`.streamlit/config.toml` carries the theme and headless server defaults.
+
+### Run with Docker
+
+One image serves **both** surfaces — the synthetic dataset is baked in at build time (fixed RNG
+seed), so there is no runtime data step:
+
+```bash
+docker compose up --build
+#   API       → http://localhost:8000/docs   (FastAPI + Swagger)
+#   Dashboard → http://localhost:8501         (Streamlit, 10 pages)
+```
+
+Or just the API:
+
+```bash
+docker build -t stocklens .
+docker run --rm -p 8000:8000 stocklens          # http://localhost:8000/docs
+```
+
+The image is multi-stage (uv-locked install in the builder, a slim non-root runtime) with a
+`HEALTHCHECK` on `/healthz`. CI builds it and smoke-tests the running container on every push.
 
 ---
 
@@ -156,9 +289,14 @@ data/                             committed synthetic seed inputs (CSV)
 seed/generate.py                  builds stocklens.duckdb (RNG-seeded)
 shims/                            open replacements for the internal infra (DuckDB / local report)
 src/stocklens/                    the importable package (transform modules + SQL)
-app/viewer.py                     Streamlit viewer (optional `viz` extra)
-cli.py                            Typer CLI: seed | consolidate | aging | all
-tests/                           worked-example unit tests
+src/stocklens/analytics.py        read-only derived analytics (value-at-cost, ABC/XYZ, GMROI, …)
+app/viewer.py                     Streamlit home (executive overview) — `viz` extra
+app/pages/                        the 9 analytical pages (Demand, Reorder, Aging, …)
+app/_data.py                      cached loaders + UI helpers shared by every page
+api/main.py                       FastAPI JSON layer over the same analytics (optional `api` extra)
+cli.py                            Typer CLI: seed | consolidate | aging | validate | all
+requirements.txt                  Streamlit Community Cloud deps; `.streamlit/config.toml` theme
+tests/                            worked-example, analytics, page-smoke, and API tests
 ```
 
 ---

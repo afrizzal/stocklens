@@ -131,6 +131,39 @@ def write_parquet(df: pd.DataFrame, path: str) -> str:
     return str(parquet_path)
 
 
+def read_table(path: str) -> pd.DataFrame:
+    """Read a local Parquet artifact into pandas **via DuckDB** (no pyarrow needed).
+
+    DuckDB is a locked runtime dependency and reads Parquet natively, so this avoids
+    requiring an extra pandas Parquet engine (``pyarrow``/``fastparquet``) — mirroring
+    :func:`write_parquet`, which writes via DuckDB. If the Parquet file is absent, falls
+    back to the ``.csv`` sibling the writer always emits.
+
+    Args:
+        path: Path to the Parquet artifact (relative paths resolve to the repo root).
+
+    Returns:
+        The artifact as a pandas DataFrame.
+
+    Raises:
+        FileNotFoundError: If neither the Parquet file nor its ``.csv`` sibling exists.
+    """
+    parquet_path = _resolve(path)
+    if parquet_path.is_file():
+        con = duckdb.connect()
+        try:
+            target = parquet_path.as_posix()
+            return con.execute(f"SELECT * FROM read_parquet('{target}')").df()  # noqa: S608
+        finally:
+            con.close()
+
+    csv_sibling = parquet_path.with_suffix(".csv")
+    if csv_sibling.is_file():
+        return pd.read_csv(csv_sibling)
+
+    raise FileNotFoundError(f"no artifact at {parquet_path} or its .csv sibling")
+
+
 def write_csv(df: pd.DataFrame, path: str) -> str:
     """Write ``df`` to a local CSV file (no object store, no spreadsheets).
 

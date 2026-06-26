@@ -74,6 +74,52 @@ def mem_con() -> Iterator[duckdb.DuckDBPyConnection]:
 
 
 # ---------------------------------------------------------------------------
+# Analytics seed — minimal inventories/margin + orders for the analytics layer.
+# ---------------------------------------------------------------------------
+_ANALYTICS_DDL = (
+    "CREATE TABLE inventories(id BIGINT, warehouse_id BIGINT, product_id BIGINT, "
+    "product_attribute_id BIGINT, remaining_quantity INTEGER)",
+    "CREATE TABLE margin_costs(inventory_id BIGINT, purchase_price_inc_ppn DOUBLE)",
+    "CREATE TABLE orders(id BIGINT, created_at TIMESTAMP, warehouse_id BIGINT, status INTEGER)",
+    "CREATE TABLE order_items(id BIGINT, order_id BIGINT, product_id BIGINT, "
+    "product_attribute_id BIGINT, quantity INTEGER)",
+)
+
+
+@pytest.fixture()
+def mini_con(mem_con: duckdb.DuckDBPyConnection) -> duckdb.DuckDBPyConnection:
+    """Seed the minimal tables :mod:`stocklens.analytics` reads (DuckDB cases).
+
+    * ``inventories`` + ``margin_costs`` — grain (1,101,101) holds two lots,
+      100 @ 7,000 and 50 @ 8,000 → value-at-cost 1,100,000 on 150 units.
+    * ``orders`` + ``order_items`` — weekly demand (as of 2026-06-25) shaped so
+      grain 101 is stable (X), 102 erratic (Z) and 103 single-week (Z).
+    """
+    con = mem_con
+    for ddl in _ANALYTICS_DDL:
+        con.execute(ddl)
+
+    con.execute("INSERT INTO inventories VALUES (1,1,101,101,100),(2,1,101,101,50)")
+    con.execute("INSERT INTO margin_costs VALUES (1,7000.0),(2,8000.0)")
+
+    # Four weekly buckets at 2026-05-28 / 06-04 / 06-11 / 06-18 (status 2 = delivered).
+    con.execute(
+        "INSERT INTO orders VALUES "
+        "(1, TIMESTAMP '2026-05-28 10:00', 1, 2),"
+        "(2, TIMESTAMP '2026-06-04 10:00', 1, 2),"
+        "(3, TIMESTAMP '2026-06-11 10:00', 1, 2),"
+        "(4, TIMESTAMP '2026-06-18 10:00', 1, 2)"
+    )
+    con.execute(
+        "INSERT INTO order_items VALUES "
+        "(10,1,101,101,10),(11,2,101,101,10),(12,3,101,101,10),(13,4,101,101,10),"  # 101: 10/10/10/10
+        "(14,1,102,102,30),(15,3,102,102,2),"  # 102: 30 then 2 → erratic
+        "(16,2,103,103,5)"  # 103: single week
+    )
+    return con
+
+
+# ---------------------------------------------------------------------------
 # Turnover seed — drives load_turnover to the TOR worked example.
 # ---------------------------------------------------------------------------
 _TURNOVER_DDL = """

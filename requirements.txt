@@ -1,0 +1,16 @@
+# Streamlit Community Cloud dependency list.
+#
+# Streamlit Cloud installs from this file (it does not use uv / pyproject.toml). It mirrors
+# the runtime deps in pyproject.toml plus Streamlit, and deliberately does NOT install the
+# `stocklens` package itself — the app adds `src/` to sys.path at startup and runs the repo
+# source directly, so the seeder (seed/generate.py) and shims resolve against the checkout.
+#
+# For local development use uv instead:  uv sync --extra viz
+streamlit>=1.30
+pandas
+numpy
+duckdb
+jinja2
+tabulate
+altair>=5
+tomli; python_version < "3.11"

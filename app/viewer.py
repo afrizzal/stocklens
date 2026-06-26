@@ -1,212 +1,203 @@
-"""StockLens portfolio viewer (Streamlit).
+"""StockLens — multi-page inventory-intelligence viewer (home / executive overview).
 
-A small, read-only dashboard over the artifacts produced by ``python cli.py all``:
-the consolidated demand/stock Parquet and the aging-stock cohort tables. It is the
-"screenshot" surface of the showcase — it loads local files only and performs **no**
-network, database-write, or any other side-effect.
+This is the Streamlit entry point (``streamlit run app/viewer.py``). It is the home
+page of a multi-page app; the analytical pages live in ``app/pages/`` and are picked
+up automatically by Streamlit's native multi-page routing. The home page is the
+executive overview: headline KPIs, the capital-at-risk callout, and a few orienting
+charts, all read-only over the artifacts ``python cli.py all`` produces.
 
-Run it (after installing the optional ``viz`` extra) with::
-
-    uv sync --extra viz
-    streamlit run app/viewer.py
-
-Streamlit is imported lazily and guarded, so importing this module (e.g. for linting
-or for ``viewer.load_consolidated`` in tests) never requires Streamlit to be installed;
-only :func:`main` needs it. If the expected outputs are missing, the app shows a friendly
-prompt to run ``python cli.py all`` rather than crashing.
+Every page (this one included) is a thin presentation script over
+:mod:`stocklens.analytics` and the shared :mod:`app._data` helpers — no business
+logic is re-implemented here, and nothing touches a live system.
 """
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-import pandas as pd
-
-if TYPE_CHECKING:  # pragma: no cover - import only for type checkers
-    from stocklens import Rules
-
-# ── Path bootstrap (mirror cli.py so a bare `streamlit run app/viewer.py` works) ─
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-_SRC_DIR = _REPO_ROOT / "src"
-for _p in (str(_SRC_DIR), str(_REPO_ROOT)):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-_DEFAULT_CONFIG = _REPO_ROOT / "config" / "rules.toml"
-_RUN_HINT = "python cli.py all"
 
 
-# ── Data loaders (pure, Streamlit-free) ──────────────────────────────────────
-
-
-def _load_rules() -> Rules:
-    """Load the rules TOML (kept local so the module imports without Streamlit)."""
-    from stocklens import load_rules
-
-    return load_rules(str(_DEFAULT_CONFIG))
-
-
-def _resolve_out_dir(rules: Rules) -> Path:
-    """Resolve the configured output dir against the repo root."""
-    out_dir = Path(rules.report.get("output_dir", "out"))
-    if not out_dir.is_absolute():
-        out_dir = _REPO_ROOT / out_dir
-    return out_dir
-
-
-def load_consolidated(rules: Rules) -> pd.DataFrame | None:
-    """Load ``out/consolidate_purchasing_agg.parquet`` if it exists, else ``None``.
-
-    Returns ``None`` (rather than raising) when the Parquet is absent so the UI can
-    prompt the user to run the pipeline. Falls back to the ``.csv`` sibling that the
-    writer also emits, so the viewer still works even if a Parquet engine is unavailable.
-    """
-    out_dir = _resolve_out_dir(rules)
-    parquet = out_dir / "consolidate_purchasing_agg.parquet"
-    if parquet.is_file():
-        try:
-            return pd.read_parquet(parquet)
-        except (ImportError, ValueError, OSError):
-            pass  # fall through to the CSV sibling
-    csv = parquet.with_suffix(".csv")
-    if csv.is_file():
-        return pd.read_csv(csv)
-    return None
-
-
-def load_aging_frames(rules: Rules) -> dict[str, pd.DataFrame] | None:
-    """Recompute the aging cohort tables from the seeded DuckDB (read-only).
-
-    The aging job renders HTML/MD to disk rather than persisting the frames, so the
-    viewer re-derives the ``daily_needs`` / ``lifestyle`` / ``all`` tables directly from
-    the seeded database via the same pure pipeline functions the CLI uses. The DuckDB
-    file is opened read-only and the call has no side-effects beyond (idempotently)
-    re-rendering the report. Returns ``None`` if the database is missing.
-    """
-    duckdb_path = Path(rules.paths["duckdb_path"])
-    if not duckdb_path.is_absolute():
-        duckdb_path = _REPO_ROOT / duckdb_path
-    if not duckdb_path.is_file():
-        return None
-
-    from datetime import date
-
-    import duckdb
-
-    from stocklens.aging_alert import categorize_and_filter, join_sell_out, load_cohort
-
-    con = duckdb.connect(str(duckdb_path), read_only=True)
-    try:
-        df_cohort = load_cohort(rules)
-        df_aged = categorize_and_filter(df_cohort, con, rules)
-        return join_sell_out(df_aged, con, rules, now=date.today())
-    finally:
-        con.close()
-
-
-# ── Streamlit UI ─────────────────────────────────────────────────────────────
-
-
-def _missing_streamlit_message() -> str:
-    return (
-        "Streamlit is not installed. Install the optional viewer extra with "
-        "`uv sync --extra viz` (or `pip install streamlit`), then run "
-        "`streamlit run app/viewer.py`."
-    )
+def _bootstrap() -> None:
+    """Put ``src`` / repo-root / ``app`` on ``sys.path`` for a bare ``streamlit run``."""
+    root = Path(__file__).resolve().parents[1]
+    for path in (str(root / "src"), str(root), str(root / "app")):
+        if path not in sys.path:
+            sys.path.insert(0, path)
 
 
 def main() -> None:
-    """Render the Streamlit dashboard (the only Streamlit-dependent entry point)."""
-    try:
-        import streamlit as st
-    except ImportError:  # pragma: no cover - exercised only without the viz extra
-        print(_missing_streamlit_message(), file=sys.stderr)
-        raise SystemExit(1) from None
+    _bootstrap()
 
-    st.set_page_config(page_title="StockLens", page_icon="📦", layout="wide")
-    st.title("📦 StockLens — Purchasing Consolidation & Aging Stock")
-    st.caption(
-        "Read-only view over `out/consolidate_purchasing_agg.parquet` and the aging "
-        "cohort tables. Synthetic data; no live systems are touched."
+    import _data as data
+    import altair as alt
+    import streamlit as st
+
+    from stocklens import analytics as A
+
+    data.setup_page(
+        "Inventory Intelligence",
+        subtitle="Demand · stock position · margin · aging — one synthetic, fully reproducible pipeline.",
+        icon="📦",
     )
 
-    rules = _load_rules()
-    df = load_consolidated(rules)
+    rules = data.get_rules()
+    df = data.require_consolidated(rules)
+    grain = data.load_grain(rules)
+    kpis = data.load_kpis(rules)
+    as_of = data.as_of(df)
 
-    if df is None:
-        st.warning(
-            f"No consolidated output found. Run **`{_RUN_HINT}`** to generate "
-            "`out/consolidate_purchasing_agg.parquet`, then reload this page."
-        )
-        st.stop()
+    st.caption(f"Data as of **{as_of:%d %b %Y}** · {int(kpis['grains'])} grains · "
+               f"{int(kpis['skus'])} SKUs · {int(kpis['warehouses'])} warehouses")  # fmt: skip
 
-    # ── Sidebar filters ──────────────────────────────────────────────────────
-    st.sidebar.header("Filters")
-
-    if "warehouse_name" in df.columns:
-        warehouses = sorted(str(w) for w in df["warehouse_name"].dropna().unique())
-        picked_wh = st.sidebar.multiselect("Warehouse", warehouses, default=warehouses)
-    else:  # pragma: no cover - defensive; column is contract-locked
-        picked_wh = []
-
-    if "cat_flow" in df.columns:
-        flows = sorted(str(c) for c in df["cat_flow"].dropna().unique())
-        picked_flow = st.sidebar.multiselect("Demand class (cat_flow)", flows, default=flows)
-    else:  # pragma: no cover
-        picked_flow = []
-
-    filtered = df
-    if picked_wh and "warehouse_name" in filtered.columns:
-        filtered = filtered[filtered["warehouse_name"].astype(str).isin(picked_wh)]
-    if picked_flow and "cat_flow" in filtered.columns:
-        filtered = filtered[filtered["cat_flow"].astype(str).isin(picked_flow)]
-
-    # ── Headline metrics ─────────────────────────────────────────────────────
+    # ── Operational scale ─────────────────────────────────────────────────────
+    st.subheader("Operational scale")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Grains", f"{len(filtered):,}")
-    if "warehouse_name" in filtered.columns:
-        c2.metric("Warehouses", filtered["warehouse_name"].nunique())
-    if "gmv" in filtered.columns:
-        c3.metric("Total GMV", f"{filtered['gmv'].sum():,.0f}")
-    if "stok_gudang" in filtered.columns:
-        c4.metric("On-hand (stok_gudang)", f"{int(filtered['stok_gudang'].sum()):,}")
+    c1.metric("Grains tracked", f"{int(kpis['grains']):,}")
+    c2.metric("Active SKUs", f"{int(kpis['skus']):,}")
+    c3.metric("Warehouses", f"{int(kpis['warehouses'])}")
+    c4.metric("On-hand units", f"{int(kpis['on_hand_units']):,}")
 
-    # ── Consolidated demand / stock table ────────────────────────────────────
-    st.subheader("Consolidated demand & stock position")
-    if "cat_flow" in filtered.columns and not filtered.empty:
-        flow_counts = (
-            filtered["cat_flow"].value_counts().rename_axis("cat_flow").reset_index(name="grains")
-        )
-        st.caption("Demand-class distribution (current filter):")
-        st.dataframe(flow_counts, hide_index=True, use_container_width=True)
-    st.dataframe(filtered, hide_index=True, use_container_width=True)
+    # ── Financial position ────────────────────────────────────────────────────
+    st.subheader("Financial position (trailing 30 days)")
+    f1, f2, f3, f4 = st.columns(4)
+    f1.metric("GMV", data.compact(kpis["gmv"]))
+    f2.metric("Gross margin", data.compact(kpis["total_margin"]), data.pct(kpis["gm_rate"]),
+              delta_color="normal")  # fmt: skip
+    f3.metric("Inventory @ cost", data.compact(kpis["inventory_value_at_cost"]))
+    f4.metric("Days inventory out", f"{kpis['days_inventory_out']:.0f} d",
+              help="Inventory at cost ÷ average daily COGS")  # fmt: skip
 
-    # ── Aging stock tables ───────────────────────────────────────────────────
-    st.subheader("Aging stock — WL cohort")
-    frames = load_aging_frames(rules)
-    if frames is None:
-        st.info(
-            f"Aging tables need the seeded database. Run **`{_RUN_HINT}`** to build "
-            "`stocklens.duckdb`."
+    # ── Capital at risk (the headline story) ──────────────────────────────────
+    st.subheader("⚠️ Capital at risk")
+    r1, r2, r3 = st.columns(3)
+    r1.metric("Dead-stock capital", data.compact(kpis["dead_stock_value"]),
+              f"{int(kpis['dead_stock_skus'])} slow-moving SKUs", delta_color="inverse")  # fmt: skip
+    r2.metric("Aged stock value-at-risk", data.compact(kpis["aged_value_at_risk"]),
+              f"{int(kpis['aged_skus'])} aged WL SKUs", delta_color="inverse")  # fmt: skip
+    share = (
+        kpis["dead_stock_value"] / kpis["inventory_value_at_cost"]
+        if kpis["inventory_value_at_cost"]
+        else 0
+    )
+    r3.metric("Dead capital share", data.pct(share),
+              help="Dead-stock value ÷ total inventory at cost")  # fmt: skip
+    st.caption(
+        "Dead-stock capital is the value-at-cost of on-hand **Slow Moving** grains — "
+        "inventory tying up cash without earning its turns. See **Margin & GMROI** and "
+        "**Aging & Dead Stock** to drill in."
+    )
+
+    st.divider()
+
+    # ── Orienting charts ──────────────────────────────────────────────────────
+    left, right = st.columns(2)
+
+    with left:
+        st.markdown("**Demand-class mix** (share of grains)")
+        flow = (
+            grain["cat_flow"]
+            .astype(str)
+            .value_counts()
+            .rename_axis("cat_flow")
+            .reset_index(name="grains")
         )
-    else:
-        left, right = st.columns(2)
-        with left:
-            st.markdown("**Daily Needs** (aged ≥ daily-needs threshold)")
-            dn = frames.get("daily_needs", pd.DataFrame())
-            if dn.empty:
-                st.write("_No aged Daily-Needs stock for the current run._")
-            else:
-                st.dataframe(dn, hide_index=True, use_container_width=True)
-        with right:
-            st.markdown("**Lifestyle** (aged ≥ lifestyle threshold)")
-            ls = frames.get("lifestyle", pd.DataFrame())
-            if ls.empty:
-                st.write("_No aged Lifestyle stock for the current run._")
-            else:
-                st.dataframe(ls, hide_index=True, use_container_width=True)
+        donut = (
+            alt.Chart(flow)
+            .mark_arc(innerRadius=60)
+            .encode(
+                theta=alt.Theta("grains:Q"),
+                color=alt.Color("cat_flow:N", sort=A.CAT_FLOW_ORDER, title="Demand class"),
+                tooltip=["cat_flow:N", "grains:Q"],
+            )
+            .properties(height=280)
+        )
+        st.altair_chart(donut, use_container_width=True)
+
+    with right:
+        st.markdown("**GMV by warehouse**")
+        by_wh = (
+            grain.groupby("warehouse_name", as_index=False)["gmv"]
+            .sum()
+            .sort_values("gmv", ascending=False)
+        )
+        bars = (
+            alt.Chart(by_wh)
+            .mark_bar()
+            .encode(
+                x=alt.X("gmv:Q", title="GMV (units)"),
+                y=alt.Y("warehouse_name:N", sort="-x", title=None),
+                tooltip=["warehouse_name:N", alt.Tooltip("gmv:Q", format=",.0f")],
+            )
+            .properties(height=280)
+        )
+        st.altair_chart(bars, use_container_width=True)
+
+    # Inventory value at cost by category.
+    st.markdown("**Inventory value at cost, by category**")
+    voc = data.load_value_at_cost(rules)
+    g_voc = grain.merge(voc, on=A.GRAIN, how="left")
+    g_voc["value_at_cost"] = g_voc["value_at_cost"].fillna(0.0)
+    by_cat = (
+        g_voc.groupby("category_name", as_index=False)["value_at_cost"]
+        .sum()
+        .sort_values("value_at_cost", ascending=False)
+    )
+    cat_bars = (
+        alt.Chart(by_cat)
+        .mark_bar()
+        .encode(
+            x=alt.X("value_at_cost:Q", title="Inventory at cost (units)"),
+            y=alt.Y("category_name:N", sort="-x", title=None),
+            tooltip=["category_name:N", alt.Tooltip("value_at_cost:Q", format=",.0f")],
+        )
+        .properties(height=240)
+    )
+    st.altair_chart(cat_bars, use_container_width=True)
+
+    # ── Page directory ────────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Explore")
+    pages = [
+        (
+            "pages/1_Demand_Classification.py",
+            "📈 Demand Classification",
+            "Velocity tiering & the weighted-score logic",
+        ),
+        (
+            "pages/2_Stock_and_Reorder.py",
+            "🚚 Stock & Reorder",
+            "Days-of-cover worklist & stockout risk",
+        ),
+        (
+            "pages/3_Aging_and_Dead_Stock.py",
+            "⏳ Aging & Dead Stock",
+            "Capital tied up past age thresholds",
+        ),
+        (
+            "pages/4_ABC_XYZ_Matrix.py",
+            "🔲 ABC-XYZ Matrix",
+            "Value × predictability stocking policy",
+        ),
+        ("pages/5_Margin_and_GMROI.py", "💰 Margin & GMROI", "Profitability per unit of inventory"),
+        (
+            "pages/6_Forecast_and_Reorder_Point.py",
+            "🔮 Forecast & Reorder Point",
+            "Backtested demand + safety stock",
+        ),
+        ("pages/7_What_if_Simulator.py", "🎛️ What-if Simulator", "Re-tune the policy live"),
+        ("pages/8_Data_Quality.py", "✅ Data Quality", "The pipeline's self-defending contract"),
+        ("pages/9_Methodology.py", "📖 Methodology", "Every formula & tunable, in plain language"),
+    ]
+    col_a, col_b = st.columns(2)
+    for i, (path, label, blurb) in enumerate(pages):
+        target = col_a if i % 2 == 0 else col_b
+        with target:
+            try:
+                st.page_link(path, label=f"**{label}** — {blurb}")
+            except Exception:  # pragma: no cover - older Streamlit fallback
+                st.markdown(f"**{label}** — {blurb}")
+
+    data.caption_synthetic()
 
 
 if __name__ == "__main__":

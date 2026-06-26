@@ -214,6 +214,49 @@ def aging(
 
 
 @app.command()
+def validate(
+    config: str = _CONFIG_OPTION,
+) -> None:
+    """Run the data-quality contract over ``out/consolidate_purchasing_agg.parquet``.
+
+    A CI-facing gate: loads the consolidated artifact and asserts the locked-schema
+    guarantees (natural-key uniqueness, non-null grain keys, non-negative stock,
+    bounded gross-margin rate, in-vocabulary categoricals — see
+    :func:`stocklens.analytics.data_quality_checks`). Prints a per-check checklist and
+    exits non-zero on any hard-check failure so a broken pipeline fails the build.
+    """
+    _configure_logging()
+    from stocklens.analytics import validate_consolidated  # noqa: PLC0415
+
+    rules = _load(config)
+    out_dir = Path(rules.report.get("output_dir", "out"))
+    if not out_dir.is_absolute():
+        out_dir = _REPO_ROOT / out_dir
+    parquet = out_dir / "consolidate_purchasing_agg.parquet"
+    if not parquet.is_file():
+        typer.secho(
+            f"consolidated artifact not found: {parquet}\nrun `python cli.py consolidate` first",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    # Read via DuckDB (no pyarrow dependency); the writer emits both .parquet and .csv.
+    df = data_io.read_table(str(parquet))
+    ok, results = validate_consolidated(df)
+    for result in results:
+        glyph = "✓" if result.passed else "✗"
+        colour = typer.colors.GREEN if result.passed else typer.colors.RED
+        tag = "" if result.hard else " (advisory)"
+        typer.secho(f"  {glyph} {result.name}{tag}: {result.detail}", fg=colour)
+
+    if not ok:
+        typer.secho("✗ data-quality contract FAILED", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+    typer.secho(f"✓ data-quality contract passed ({len(results)} checks)", fg=typer.colors.GREEN)
+
+
+@app.command()
 def all(  # noqa: A001 - "all" is the contract-mandated subcommand name
     config: str = _CONFIG_OPTION,
     now: str | None = _NOW_OPTION,

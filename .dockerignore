@@ -1,0 +1,18 @@
+# Keep the build context (and the image) lean and safe.
+.git
+.github
+.venv
+**/__pycache__
+*.pyc
+.mypy_cache
+.pytest_cache
+.ruff_cache
+
+# Regenerated inside the build by `cli.py all` — never copy host artifacts.
+out
+stocklens.duckdb
+
+# Never ship the quarantined origin material or any local env.
+private
+.env
+.env.*

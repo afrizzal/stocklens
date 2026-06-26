@@ -1,0 +1,30 @@
+# StockLens — the full product in one command:  docker compose up --build
+#
+#   * API       → http://localhost:8000/docs   (FastAPI + Swagger)
+#   * Dashboard → http://localhost:8501         (Streamlit, 10 pages)
+#
+# Both services run the SAME image (built once by `api`); the dashboard overrides the
+# command. The synthetic dataset is baked into the image, so there is no data step.
+
+services:
+  api:
+    build: .
+    image: stocklens:latest
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  dashboard:
+    image: stocklens:latest
+    depends_on:
+      - api
+    command:
+      - streamlit
+      - run
+      - app/viewer.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.headless=true
+    ports:
+      - "8501:8501"
+    restart: unless-stopped

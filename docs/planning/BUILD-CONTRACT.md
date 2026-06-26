@@ -10,7 +10,11 @@
 > pipelines. The originals (which ran on a Redshift + Airflow + Tableau + Google Sheets stack)
 > are quarantined privately and are **never** published.
 >
-> **Contract version:** 1.0.0 · **Target Python:** 3.10+ (dev box 3.10.6) · **Manager:** `uv`
+> **Contract version:** 1.1.0 · **Target Python:** 3.10+ (dev box 3.10.6) · **Manager:** `uv`
+>
+> **v1.1.0 (additive):** adds a read-only analytics layer and a multi-page viewer **on top of** the
+> locked artifacts. The pipeline math, the `Rules`/config keys, and the 44-column consolidated schema
+> (§3.4) are **unchanged**. See §9.
 
 ---
 
@@ -736,3 +740,41 @@ stocklens/
    tree (grep gate before commit) — only the synthetic vocabulary of this contract appears.
 6. No network/SMTP/Sheets/object-store/BI call exists in any committed file.
 7. Output column order of `consolidate_purchasing_agg` matches §3.4 exactly.
+
+---
+
+## 9. v1.1.0 — Analytics & multi-page app (ADDITIVE)
+
+This release adds a read-only analytics/presentation layer **on top of** the locked pipeline. It is
+strictly additive: the seed, the four transform modules, the SQL, the `Rules`/config keys (§2), and
+the 44-column consolidated schema (§3.4) are **unchanged**, and no new live side-effect is introduced
+(the guardrails of §0 still hold — the only writes are the same local `out/` artifacts).
+
+### 9.1 New components
+
+| Path | Role |
+|---|---|
+| `src/stocklens/analytics.py` | Pure, typed derived analytics over the consolidated Parquet + seeded DuckDB: grain de-duplication, inventory **value at cost** (reconstructed from `inventories × margin_costs`), headline KPIs, days-of-cover / reorder worklist, ABC + XYZ + the 3×3 matrix, GMROI, a daily-demand forecast + holdout backtest, reorder point / safety stock, and the data-quality contract. No writes, no network. |
+| `app/_data.py` | Streamlit-cached loaders + UI helpers + a first-boot `ensure_artifacts` seeder (rebuilds the git-ignored artifacts on a cold deploy). |
+| `app/viewer.py` | Repurposed as the multi-page **home** (executive overview); still the `streamlit run` entry point. |
+| `app/pages/*.py` | The nine analytical pages (Demand, Stock & Reorder, Aging & Dead Stock, ABC-XYZ, Margin & GMROI, Forecast & Reorder Point, What-if Simulator, Data Quality, Methodology). |
+| `cli.py validate` | Runs `analytics.validate_consolidated` over the artifact; exits non-zero on any hard-check failure (CI gate). |
+| `tests/test_analytics.py` | Unit tests for the analytics core, incl. the grain double-counting trap and a corrupted-frame-must-fail contract test. |
+| `tests/test_app_smoke.py` | Executes every page's `main()` against the real artifacts with `streamlit`/`altair` stubbed (no runtime / no extra). |
+| `api/main.py` | A thin **FastAPI** JSON layer (`uvicorn api.main:app`) exposing the same analytics as REST: `/healthz`, `/kpis`, `/grains`, `/demand/classification`, `/stock/reorder`, `/aging`, `/margin/gmroi`, `/abc-xyz`, `POST /simulate`, with auto OpenAPI at `/docs`. Read-only; reuses the pure functions (`api` optional extra). |
+| `tests/test_api.py` | `TestClient` coverage of every endpoint (skipped without the `api` extra). |
+| `requirements.txt`, `.streamlit/config.toml` | Streamlit Community Cloud deploy. |
+| `Dockerfile`, `.dockerignore`, `docker-compose.yml` | One multi-stage image (non-root, healthchecked) serving the API (default) or the dashboard (CMD override); the deterministic artifacts are baked at build time. CI builds the image and smoke-tests the running container. |
+
+### 9.2 Rules that still hold
+
+1. The locked schema (§3.4) and all `Rules` keys (§2) are read, never written or extended. App-only
+   planning policy (ABC/XYZ cut-points, service-level *z*) lives in an `analytics.AnalyticsConfig`
+   dataclass, **not** in `config/rules.toml`.
+2. Any value roll-up first collapses the consolidated frame to one row per grain
+   (`analytics.to_grain`) — the stock/margin/classification columns repeat across the
+   `window × outlier-treatment` rows, so a naive sum over-counts ~8×.
+3. `value_at_cost` is the only metric reconstructed from the raw DuckDB lots (the locked schema drops
+   it); it is read-only and 0-filled for grains without lots.
+4. mypy still passes on `src` (analytics is fully typed); `ruff` passes repo-wide; the app smoke test
+   needs no optional extra so the default CI run stays green.
